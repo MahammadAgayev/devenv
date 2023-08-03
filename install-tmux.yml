@@ -1,0 +1,9 @@
+- hosts: localhost
+  become: true
+  tasks: 
+    - name: Install tmux 
+      apt: name=tmux
+    - name: Install fuzzy 
+      apt: name=fzf
+    - name: Configure session search
+      //TODO:
