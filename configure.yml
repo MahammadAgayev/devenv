@@ -3,7 +3,7 @@
   tasks:
     - name: Install packages
       apt: 
-        name: [ "zsh", "git", "tmux", "wireshark", "fzf", "curl"]
+        name: [ "zsh", "git", "tmux", "fzf", "curl"]
     - name: Change shell
       shell: chsh -s `which zsh`
     - name: Install ohmyzsh
