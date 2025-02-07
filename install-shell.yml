@@ -13,3 +13,9 @@
         dest: ~/.oh-my-zsh/plugins/zsh-autosuggestions
     - name: Update zshrc
       shell: sed -i 's/(git/(git zsh-autosuggestions' ~/.zshrc
+    - name: Install packages
+      apt:
+	 name: [ "tmux", "wireshark", "fzf", "kdenlive", "gimp", "xclip", "screenkey", "tldr", "ripgrep", "shutter" ]
+      tags:
+        - install
+        - productivity
