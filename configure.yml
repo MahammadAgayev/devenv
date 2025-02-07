@@ -11,10 +11,16 @@
       ansible.builtin.git:
         repo: git clone https://github.com/zsh-users/zsh-autosuggestions.git
         dest: ~/.oh-my-zsh/plugins/zsh-autosuggestions
+
     - name: Install packages
       apt:
 	 name: [ "tmux", "wireshark", "fzf", "kdenlive", "gimp", "xclip", "screenkey", "tldr", "ripgrep", "shutter" ]
-      tags:
-        - install
-        - productivity
 
+   - name: Fetch .zshrc from the Github
+     get_url: https://raw.githubusercontent.com/MahammadAgayev/devenv/refs/heads/main/.zshrc
+     dest: ~/.zshrc
+     mode: '0644'
+   - name: Fetch .p10k.zsh from the Github
+     get_url: https://raw.githubusercontent.com/MahammadAgayev/devenv/refs/heads/main/.p10k.zsh
+     dest: ~/.p10k.zsh
+     mode: '0644'
