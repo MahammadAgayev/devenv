@@ -1,0 +1,7 @@
+- hosts: localhost
+  tasks:
+    - name: Fetch tmux-sessionizer from the Github
+      get_url:
+        url: "https://raw.githubusercontent.com/MahammadAgayev/devenv/refs/heads/main/tmux-sessionizer"
+        dest: ~/tmux-sessionizer
+        mode: '0744'
