@@ -7,10 +7,27 @@
     - name: Change shell
       shell: chsh -s `which zsh`
       become: true
-    - name: Install ohmyzsh
+
+    - name: Check if Oh My Zsh is already installed
+      stat:
+        path: "{{ lookup('env', 'ZSH') | default('/home/{{ ansible_user }}/.oh-my-zsh') }}"
+      register: zsh_status
+
+    - name: Install Oh My Zsh
       shell: curl -L https://raw.github.com/robbyrussell/oh-my-zsh/master/tools/install.sh | sh
-    - name: Install p10k
-      shell: git clone --depth=1 https://github.com/romkatv/powerlevel10k.git "${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}/themes/powerlevel10k"
+      args:
+        executable: /bin/bash
+      when: not zsh_status.stat.exists
+
+    - name: Check if Powerlevel10k theme is already installed
+      stat:
+        path: "{{ (lookup('env', 'ZSH_CUSTOM') or lookup('env', 'HOME') + '/.oh-my-zsh/custom') + '/themes/powerlevel10k' }}"
+      register: p10k_status
+
+    - name: Install Powerlevel10k theme
+      shell: git clone --depth=1 https://github.com/romkatv/powerlevel10k.git "{{ (lookup('env', 'ZSH_CUSTOM') or lookup('env', 'HOME') + '/.oh-my-zsh/custom') + '/themes/powerlevel10k' }}"
+      when: not p10k_status.stat.exists
+      
     - name: Install zsh plugin autosuggestion
       ansible.builtin.git:
         repo: https://github.com/zsh-users/zsh-autosuggestions.git
@@ -38,6 +55,8 @@
         src: "~/devenv/tmux-sessionizer"
         dest: ~/tmux-sessionizer
         mode: '0744'
+        
+    #NeoVIM 
     - name: Copy Neovim Configuration
       copy:
         src: "~/devenv/nvim"
