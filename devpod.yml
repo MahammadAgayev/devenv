@@ -1,4 +1,0 @@
-tasks:
-  - name: Install Shell
-    command: curl https://raw.githubusercontent.com/MahammadAgayev/devenv/refs/heads/main/install-shell.yml -o install-shell.yml && ansible-playbook install-shell.yml
-    when: on-create
