@@ -36,7 +36,7 @@
     #Below mainly configuration for myself, feel free to use it.
     - name: Checkout Configuration Files
       ansible.builtin.git:
-        repo: git@github.com:MahammadAgayev/devenv.git
+        repo: https://github.com/MahammadAgayev/devenv.git
         dest: ~/devenv
 
     #SHELL
