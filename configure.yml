@@ -60,4 +60,4 @@
     - name: Copy Neovim Configuration
       copy:
         src: "~/devenv/nvim"
-        dest: ~/.config/nvim
+        dest: ~/.config/
