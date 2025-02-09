@@ -1,11 +1,12 @@
 - hosts: localhost
-  become: true
   tasks:
     - name: Install packages
-      apt: 
+      apt:
         name: [ "zsh", "git", "tmux", "fzf", "curl"]
+      become: true
     - name: Change shell
       shell: chsh -s `which zsh`
+      become: true
     - name: Install ohmyzsh
       shell: curl -L https://raw.github.com/robbyrussell/oh-my-zsh/master/tools/install.sh | sh
     - name: Install p10k
@@ -15,17 +16,17 @@
         repo: https://github.com/zsh-users/zsh-autosuggestions.git
         dest: ~/.oh-my-zsh/plugins/zsh-autosuggestions
     - name: Fetch .zshrc from the Github
-      get_url: 
+      get_url:
         url: "https://raw.githubusercontent.com/MahammadAgayev/devenv/refs/heads/main/.zshrc"
         dest: ~/.zshrc
         mode: '0644'
     - name: Fetch .p10k.zsh from the Github
-      get_url: 
+      get_url:
         url: "https://raw.githubusercontent.com/MahammadAgayev/devenv/refs/heads/main/.p10k.zsh"
         dest: ~/.p10k.zsh
         mode: '0644'
     - name: Fetch tmux-sessionizer from the Github
-      get_url: 
+      get_url:
         url: "https://raw.githubusercontent.com/MahammadAgayev/devenv/refs/heads/main/tmux-sessionizer"
         dest: ~/tmux-sessionizer
         mode: '0655'
