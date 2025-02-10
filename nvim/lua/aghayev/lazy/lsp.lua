@@ -72,6 +72,13 @@ return {
                         }
                     }
                 end,
+                ["gopls"] = function()
+                    local lspconfig = require("lspconfig")
+                    lspconfig.gopls.setup {
+                        capabilities = capabilities,
+                        root_dir = lspconfig.util.root_pattern("main.go"),
+                    }
+                end,
             }
         })
 
