@@ -5,10 +5,10 @@
         name: [ "zsh", "git", "tmux", "fzf", "curl"]
       when: ansible_facts['os_family'] == "RedHat" or ansible_facts['os_family'] == "Debian"
 
-    - name: Install a package with Homebrew
-      homebrew:
-        name: [ "zsh", "git", "tmux", "fzf", "curl"]
-      when: ansible_facts['ansible_system'] == "Darwin"      
+#    - name: Install a package with Homebrew
+#     homebrew:
+#       name: [ "zsh", "git", "tmux", "fzf", "curl"]
+#     when: ansible_facts['ansible_system'] == "Darwin"      
       
       become: true
     - name: Change shell
