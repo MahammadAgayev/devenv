@@ -120,5 +120,5 @@ alias vim="nvim"
 
 #Have tmux session open by default
 if command -v tmux &> /dev/null && [ -z "$TMUX" ]; then
-  tmux attach-session -t default || tmux new-session -s default
+  tmux -u attach-session -t default || tmux -u new-session -s default
 fi
