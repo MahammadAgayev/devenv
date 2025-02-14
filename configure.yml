@@ -40,17 +40,24 @@
         dest: ~/devenv
 
     #SHELL
-    - name: Fetch .zshrc from the Github
+    - name: Fetch .zshrc
       copy:
         src: "~/devenv/.zshrc"
         dest: ~/.zshrc
         mode: '0644'
-    - name: Fetch .p10k.zsh from the Github
+    - name: Copy .p10k.zsh
       copy:
         src: "~/devenv/.p10k.zsh"
         dest: ~/.p10k.zsh
         mode: '0644'
-    - name: Fetch tmux-sessionizer from the Github
+
+    - name: Copy tmux conf
+      copy:
+        src: "~/devenv/.tmux.conf"
+        dest: ~/.tmux.conf
+        mode: '0644'
+        
+    - name: Copy tmux-sessionizer
       copy:
         src: "~/devenv/tmux-sessionizer"
         dest: ~/tmux-sessionizer
