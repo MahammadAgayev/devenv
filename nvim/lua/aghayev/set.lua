@@ -1,5 +1,7 @@
 vim.opt.guicursor = ""
 
+vim.env.PATH = vim.env.VIM_PATH or vim.env.PATH
+
 vim.opt.nu = true
 vim.opt.relativenumber = true
 
