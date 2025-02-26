@@ -74,4 +74,16 @@
     - name: Copy Neovim Configuration
       copy:
         src: "~/devenv/nvim"
-        dest: ~/.config/
+        dest: ~/.config/ 
+        
+    #Uber's go monorepo setup 
+    - name: Check if the ~/go-code directory exists
+      stat:
+        path: "~/go-code"
+      register: dir_status
+
+    - name: Copy the file to $HOME/go-code if the directory exists
+      copy:
+        src: ".gomonorepo.envrc.local"
+        dest: "~/go-code/.envrc.local"
+      when: dir_status.stat.exists
