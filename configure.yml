@@ -8,7 +8,20 @@
 #    - name: Install a package with Homebrew
 #     homebrew:
 #       name: [ "zsh", "git", "tmux", "fzf", "curl", "deno"]
-#     when: ansible_facts['ansible_system'] == "Darwin"      
+#     when: ansible_facts['ansible_system'] == "Darwin" 
+
+    - name: Ensure multiple directories exist
+      hosts: localhost
+      tasks:
+        - name: Ensure directories exists
+          file:
+            path: "~/{{ item }}"
+            state: directory
+            mode: '0755'
+          loop:
+            - debug
+            - any
+            - src
       
       become: true
     - name: Change shell
