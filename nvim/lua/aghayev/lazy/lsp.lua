@@ -63,7 +63,7 @@ return {
                 "rust_analyzer",
                 "gopls",
                 "csharp_ls",
-                "python-lsp-server",
+                "pylsp",
             },
             handlers = {
                 function(server_name) -- default handler (optional)
