@@ -12,14 +12,12 @@ vim.keymap.set('i', '<S-Tab>', 'copilot#Accept("\\<S-Tab>")', { expr = true, rep
 
 -- Copilot chat
 local chat = require('CopilotChat')
-local prompts = require('CopilotChat.config.prompts')
 local select = require('CopilotChat.select')
 local providers = require('CopilotChat.config.providers')
 local cutils = require('CopilotChat.utils')
 
 local COPILOT_PLAN = [[
 You are a software architect and technical planner focused on clear, actionable development plans.
-]] .. prompts.COPILOT_BASE.system_prompt .. [[
 
 When creating development plans:
 - Start with a high-level overview
