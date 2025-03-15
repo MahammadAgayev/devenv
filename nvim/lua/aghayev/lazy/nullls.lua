@@ -12,7 +12,7 @@ return {
 
     local arc_lint = {
         method = null_ls.methods.DIAGNOSTICS,
-        filetypes = {}, -- Empty to allow all file types
+        filetypes = { "go"}, 
         generator = null_ls.generator({
             command = "arc",
             args = { "lint", "--output", "json", "$FILENAME" },
