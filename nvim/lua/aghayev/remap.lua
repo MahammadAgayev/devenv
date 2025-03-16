@@ -60,3 +60,6 @@ vim.keymap.set("n", "<leader>mr", "<cmd>CellularAutomaton make_it_rain<CR>");
 vim.keymap.set("n", "<leader><leader>", function()
     vim.cmd("so")
 end)
+
+-- open terminal on the right panel
+vim.keymap.set("n", "<leader>t", "<cmd>belowright vsplit | term<CR>")
