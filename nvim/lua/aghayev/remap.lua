@@ -61,5 +61,9 @@ vim.keymap.set("n", "<leader><leader>", function()
     vim.cmd("so")
 end)
 
--- open terminal on the right panel
-vim.keymap.set("n", "<leader>t", "<cmd>belowright vsplit | term<CR>")
+-- open terminal
+vim.keymap.set("n", "<leader>tr", "<cmd>belowright vsplit | term<CR>")
+vim.keymap.set("n", "<leader>tc", "<cmd>belowright vsplit | lcd %:p:h | term<CR>")
+
+-- return to normal mode in terminal
+vim.keymap.set('t', '<Esc><Esc>', [[<C-\><C-n>]], { noremap = true, silent = true })
