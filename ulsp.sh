@@ -1,9 +1,9 @@
 #!/bin/sh
 set -x
 #go
-monorepo="home/user/go-code"  # Replace with your monorepo path
+monorepo="/home/user/go-code"  # Replace with your monorepo path
 #java
-#monorepo="home/user/fievel"
+#monorepo="/home/user/fievel"
 
 cd "$monorepo" || exit 1
 while true; do
