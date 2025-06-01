@@ -2,7 +2,7 @@
 local function read_config()
   local config_path = vim.fn.stdpath("config") .. "/lua/aghayev/config.json"
   local file = io.open(config_path, "r")
-  
+
   if not file then
     -- Fallback to default values if config file doesn't exist
     return {
@@ -13,10 +13,10 @@ local function read_config()
       }
     }
   end
-  
+
   local content = file:read("*all")
   file:close()
-  
+
   local success, config = pcall(vim.json.decode, content)
   if not success then
     -- Fallback to default values if JSON parsing fails
@@ -28,7 +28,7 @@ local function read_config()
       }
     }
   end
-  
+
   return config
 end
 
@@ -45,9 +45,11 @@ return {
     openai = {
         endpoint = config.avante.endpoint,
         model = config.avante.model,
-        timeout = 30000, -- Timeout in milliseconds, increase this for reasoning models
-        headers = {
-            ["openai-organization"] = config.avante.openai_organization
+        timeout = 60000, -- Timeout in milliseconds, increase this for reasoning models
+        extra_headers = {
+            ["openai-organization"] = config.avante.openai_organization,
+            ["Rpc-Service"] =  "genai-api",
+            ["Rpc-Caller"] =  "genai-api_uberinternal_com"
         }
     },
   },
