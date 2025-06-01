@@ -127,9 +127,11 @@ if command -v tmux &> /dev/null && [ -z "$TMUX" ]; then
 fi
 
 
-# Uber internal cerberus
+# Uber GenAI
 # Generates ceberus session on init with genai-api.
 #
+
+OPENAI_API_KEY="N/A"
 
 cerberus_auto() {
 SESSION_NAME="cerberus"
