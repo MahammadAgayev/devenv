@@ -1,3 +1,4 @@
+
 -- Read configuration from config.json
 local function read_config()
   local config_path = vim.fn.stdpath("config") .. "/lua/aghayev/config.json"
@@ -42,16 +43,18 @@ return {
     -- add any opts here
     -- for example
     provider = "openai",
-    openai = {
-        endpoint = config.avante.endpoint,
-        model = config.avante.model,
-        timeout = 60000, -- Timeout in milliseconds, increase this for reasoning models
-        extra_headers = {
-            ["openai-organization"] = config.avante.openai_organization,
-            ["Rpc-Service"] =  "genai-api",
-            ["Rpc-Caller"] =  "genai-api_uberinternal_com"
-        }
-    },
+    providers = {
+        openai = {
+            endpoint = config.avante.endpoint,
+            model = config.avante.model,
+            timeout = 60000, -- Timeout in milliseconds, increase this for reasoning models
+            extra_headers = {
+                ["openai-organization"] = config.avante.openai_organization,
+                ["Rpc-Service"] =  "genai-api",
+                ["Rpc-Caller"] =  "genai-api_uberinternal_com"
+            }
+        },
+    }
   },
   -- if you want to build from source then do `make BUILD_FROM_SOURCE=true`
   build = "make",
