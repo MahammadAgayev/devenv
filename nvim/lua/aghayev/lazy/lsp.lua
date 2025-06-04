@@ -56,7 +56,11 @@ return {
 
         require('lspconfig')['ulsp'].setup({})
         require("fidget").setup({})
-        require("mason").setup()
+        -- Mason no longer prepends its bin directory to PATH by default.
+        -- Explicitly append it so that installed servers are found.
+        require("mason").setup({
+            PATH = "append",
+        })
         require("mason-lspconfig").setup({
             ensure_installed = {
                 "lua_ls",
@@ -65,52 +69,43 @@ return {
                 "csharp_ls",
                 "pylsp",
             },
-            handlers = {
-                function(server_name) -- default handler (optional)
-                    require("lspconfig")[server_name].setup {
-                        capabilities = capabilities
-                    }
-                end,
-
-                zls = function()
-                    local lspconfig = require("lspconfig")
-                    lspconfig.zls.setup({
-                        root_dir = lspconfig.util.root_pattern(".git", "build.zig", "zls.json"),
-                        settings = {
-                            zls = {
-                                enable_inlay_hints = true,
-                                enable_snippets = true,
-                                warn_style = true,
-                            },
-                        },
-                    })
-                    vim.g.zig_fmt_parse_errors = 0
-                    vim.g.zig_fmt_autosave = 0
-
-                end,
-                ["lua_ls"] = function()
-                    local lspconfig = require("lspconfig")
-                    lspconfig.lua_ls.setup {
-                        capabilities = capabilities,
-                        settings = {
-                            Lua = {
-                                runtime = { version = "Lua 5.1" },
-                                diagnostics = {
-                                    globals = { "bit", "vim", "it", "describe", "before_each", "after_each" },
-                                }
-                            }
-                        }
-                    }
-                end,
-                ["gopls"] = function()
-                    local lspconfig = require("lspconfig")
-                    lspconfig.gopls.setup {
-                        capabilities = capabilities,
-                        root_dir = lspconfig.util.root_pattern(".git"),
-                    }
-                end,
-            }
+            automatic_enable = false,
         })
+
+        local lspconfig = require("lspconfig")
+        for _, server in ipairs({ "rust_analyzer", "csharp_ls", "pylsp" }) do
+            lspconfig[server].setup { capabilities = capabilities }
+        end
+
+        lspconfig.zls.setup({
+            root_dir = lspconfig.util.root_pattern(".git", "build.zig", "zls.json"),
+            settings = {
+                zls = {
+                    enable_inlay_hints = true,
+                    enable_snippets = true,
+                    warn_style = true,
+                },
+            },
+        })
+        vim.g.zig_fmt_parse_errors = 0
+        vim.g.zig_fmt_autosave = 0
+
+        lspconfig.lua_ls.setup {
+            capabilities = capabilities,
+            settings = {
+                Lua = {
+                    runtime = { version = "Lua 5.1" },
+                    diagnostics = {
+                        globals = { "bit", "vim", "it", "describe", "before_each", "after_each" },
+                    }
+                }
+            }
+        }
+
+        lspconfig.gopls.setup {
+            capabilities = capabilities,
+            root_dir = lspconfig.util.root_pattern(".git"),
+        }
 
         local cmp_select = { behavior = cmp.SelectBehavior.Select }
 
