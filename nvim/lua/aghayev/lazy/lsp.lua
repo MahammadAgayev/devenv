@@ -54,7 +54,7 @@ return {
             },
         }
 
-        lspconfig = require('lspconfig')
+        local lspconfig = require("lspconfig")
 
         lspconfig['ulsp'].setup({})
         require("fidget").setup({})
@@ -62,18 +62,25 @@ return {
         require("mason-lspconfig").setup({
             ensure_installed = {
                 "lua_ls",
-                "rust_analyzer",
                 "gopls",
-                "csharp_ls",
                 "pylsp",
             },
             automatic_enable = false,
         })
 
-        local lspconfig = require("lspconfig")
-        for _, server in ipairs({ "rust_analyzer", "csharp_ls", "pylsp" }) do
-            lspconfig[server].setup { capabilities = capabilities }
-        end
+        lspconfig.pylsp.setup {
+            capabilities = capabilities,
+            settings = {
+                pylsp = {
+                    plugins = {
+                        pycodestyle = {
+                            ignore = {'E501'}, -- This is the Error code for line too long.
+                            maxLineLength = 200 -- This sets how long the line is allowed to be. Also has effect on formatter.
+                        },
+                    },
+                }
+            }
+        }
 
         lspconfig.lua_ls.setup {
             capabilities = capabilities,
