@@ -54,13 +54,11 @@ return {
             },
         }
 
-        require('lspconfig')['ulsp'].setup({})
+        lspconfig = require('lspconfig')
+
+        lspconfig['ulsp'].setup({})
         require("fidget").setup({})
-        -- Mason no longer prepends its bin directory to PATH by default.
-        -- Explicitly append it so that installed servers are found.
-        require("mason").setup({
-            PATH = "append",
-        })
+        require("mason").setup({})
         require("mason-lspconfig").setup({
             ensure_installed = {
                 "lua_ls",
@@ -76,19 +74,6 @@ return {
         for _, server in ipairs({ "rust_analyzer", "csharp_ls", "pylsp" }) do
             lspconfig[server].setup { capabilities = capabilities }
         end
-
-        lspconfig.zls.setup({
-            root_dir = lspconfig.util.root_pattern(".git", "build.zig", "zls.json"),
-            settings = {
-                zls = {
-                    enable_inlay_hints = true,
-                    enable_snippets = true,
-                    warn_style = true,
-                },
-            },
-        })
-        vim.g.zig_fmt_parse_errors = 0
-        vim.g.zig_fmt_autosave = 0
 
         lspconfig.lua_ls.setup {
             capabilities = capabilities,
