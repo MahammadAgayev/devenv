@@ -42,7 +42,7 @@ return {
   opts = {
     -- add any opts here
     -- for example
-    provider = "openai",
+    provider = "copilot",
     providers = {
         openai = {
             endpoint = config.avante.endpoint,
@@ -53,7 +53,16 @@ return {
                 ["Rpc-Service"] =  "genai-api",
                 ["Rpc-Caller"] =  "genai-api_uberinternal_com"
             }
-        },
+      },
+       copilot = {
+        endpoint = "https://api.githubcopilot.com",
+        model = "gpt-4o-2024-11-20",
+        proxy = nil,
+        allow_insecure = false, -- Allow insecure server connections
+        timeout = 30000, -- Timeout in milliseconds
+        temperature = 0.75,
+        max_tokens = 20480,
+       },
     }
   },
   -- if you want to build from source then do `make BUILD_FROM_SOURCE=true`
