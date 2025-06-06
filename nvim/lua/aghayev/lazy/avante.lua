@@ -61,7 +61,6 @@ return {
         allow_insecure = false, -- Allow insecure server connections
         timeout = 30000, -- Timeout in milliseconds
         temperature = 0.75,
-        max_tokens = 20480,
        },
     }
   },
