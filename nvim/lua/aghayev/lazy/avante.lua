@@ -60,7 +60,9 @@ return {
         proxy = nil,
         allow_insecure = false, -- Allow insecure server connections
         timeout = 30000, -- Timeout in milliseconds
-        temperature = 0.75,
+        extra_request_body = {
+          temperature = 0.75,
+        }
        },
     }
   },
