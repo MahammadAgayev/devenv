@@ -7,6 +7,7 @@ return {
       suggestion = { enabled = false },
       panel = { enabled = false },
       auto_trigger = true,
+      copilot_model = "claude-3.7-sonnet",
     })    
   end,
 }
