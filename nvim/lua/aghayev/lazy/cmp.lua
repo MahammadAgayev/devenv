@@ -10,13 +10,6 @@ return {
     'zbirenbaum/copilot-cmp',
   },
   config = function()
-    -- Setup Copilot (disable inline suggestion/panel)
-    require("copilot").setup({
-      suggestion = { enabled = false },
-      panel = { enabled = false },
-    })
-    require("copilot_cmp").setup()
-
     local cmp = require("cmp")
     local lspkind = require("lspkind")
 
