@@ -12,7 +12,7 @@ return {
 
     local arc_lint = {
         method = null_ls.methods.DIAGNOSTICS,
-        filetypes = { "go"}, 
+        filetypes = { "go", "python"}, 
         generator = null_ls.generator({
             command = "arc",
             args = { "lint", "--output", "json", "$FILENAME" },
