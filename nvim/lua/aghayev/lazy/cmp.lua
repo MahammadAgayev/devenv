@@ -22,17 +22,20 @@ return {
           symbol_map = { Copilot = "" },
         }),
       },
+
+      cmp_select = { behavior = cmp.SelectBehavior.Select };
+
       mapping = cmp.mapping.preset.insert({
         ["<C-b>"] = cmp.mapping.scroll_docs(-4),
         ["<C-f>"] = cmp.mapping.scroll_docs(4),
         ["<C-Space>"] = cmp.mapping.complete(),
-        ['<C-p>'] = cmp.mapping.select_prev_item(cmp_select),
-        ['<C-n>'] = cmp.mapping.select_next_item(cmp_select),
+        ['<C-p>'] = cmp.mapping.select_prev_item({ behavior = cmp.SelectBehavior.Select }),
+        ['<C-n>'] = cmp.mapping.select_next_item({ behavior = cmp.SelectBehavior.Select }),
         ['<C-y>'] = cmp.mapping.confirm({ select = true }),
         ["<C-e>"] = cmp.mapping.abort(),
       }),
       sources = cmp.config.sources({
-        { name = "avante" },
+        { name = "copilot" },
         { name = "nvim_lsp" },
         { name = "buffer" },
         { name = "path" },
