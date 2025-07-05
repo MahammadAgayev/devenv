@@ -97,3 +97,38 @@
         src: ".gomonorepo.envrc.local"
         dest: "~/go-code/.envrc.local"
       when: dir_status.stat.exists
+
+
+   # LLM helpers
+    - name: Check if uv is installed
+      command: which uv
+      register: uv_check
+      failed_when: false
+      changed_when: false
+
+    - name: Install uv if not present
+      shell: curl -LsSf https://astral.sh/uv/install.sh | sh
+      when: uv_check.rc != 0
+
+    - name: Reload shell environment for uv
+      shell: source ~/.bashrc || source ~/.zshrc || true
+      when: uv_check.rc != 0
+
+    - name: Check if vectorcode is installed
+      command: uv tool list
+      register: vectorcode_check
+      failed_when: false
+      changed_when: false
+
+    - name: Install vectorcode CLI with uv
+      command: uv tool install vectorcode[lsp,mcp] --python python{{ python_version }}
+      when: "'vectorcode' not in vectorcode_check.stdout"
+
+    - name: Verify vectorcode installation
+      command: vectorcode --version
+      register: vectorcode_version
+      changed_when: false
+
+    - name: Display vectorcode version
+      debug:
+        msg: "VectorCode CLI installed successfully: {{ vectorcode_version.stdout }}"%
