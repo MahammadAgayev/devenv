@@ -1,7 +1,7 @@
 require("aghayev.set")
 require("aghayev.remap")
 require("aghayev.lazy_init")
-require("aghayev.config.copilot")
+require("aghayev.config.ai")
 
 local augroup = vim.api.nvim_create_augroup
 local aghayevGroup = augroup('aghayev', {})
