@@ -152,3 +152,7 @@ fi
 
 
 alias cerb_auto="cerberus_auto"
+
+if [[ -f ~/.zshenv ]]; then
+  source ~/.zshenv
+fi
