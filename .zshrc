@@ -153,6 +153,6 @@ fi
 
 alias cerb_auto="cerberus_auto"
 
-if [[ -f ~/.zshenv ]]; then
-  source ~/.zshenv
+if [[ -f ~/.zshlocal ]]; then
+  source ~/.zshlocal
 fi
