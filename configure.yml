@@ -8,18 +8,17 @@
 #    - name: Install a package with Homebrew
 #     homebrew:
 #       name: [ "zsh", "git", "tmux", "fzf", "curl", "deno"]
-#     when: ansible_facts['ansible_system'] == "Darwin" 
+#     when: ansible_facts['ansible_system'] == "Darwin"
 
     - name: Ensure directories exists
       file:
-        path: "~/{{ item }}"
+        path: "{{ ansible_env.HOME }}/{{ item }}"
         state: directory
         mode: '0755'
       loop:
         - debug
         - any
         - src
-      
       become: true
     - name: Change shell
       shell: chsh -s `which zsh`
@@ -44,61 +43,61 @@
     - name: Install Powerlevel10k theme
       shell: git clone --depth=1 https://github.com/romkatv/powerlevel10k.git "{{ (lookup('env', 'ZSH_CUSTOM') or lookup('env', 'HOME') + '/.oh-my-zsh/custom') + '/themes/powerlevel10k' }}"
       when: not p10k_status.stat.exists
-      
+
     - name: Install zsh plugin autosuggestion
       ansible.builtin.git:
         repo: https://github.com/zsh-users/zsh-autosuggestions.git
-        dest: ~/.oh-my-zsh/plugins/zsh-autosuggestions
+        dest: "{{ ansible_env.HOME }}/.oh-my-zsh/plugins/zsh-autosuggestions"
 
     #Below mainly configuration for myself, feel free to use it.
     - name: Checkout Configuration Files
       ansible.builtin.git:
         repo: https://github.com/MahammadAgayev/devenv.git
-        dest: ~/devenv
+        dest: "{{ ansible_env.HOME }}/devenv"
 
     #SHELL
     - name: Fetch .zshrc
       copy:
-        src: "~/devenv/.zshrc"
-        dest: ~/.zshrc
+        src: "{{ ansible_env.HOME }}/devenv/.zshrc"
+        dest: "{{ ansible_env.HOME }}/.zshrc"
         mode: '0644'
     - name: Copy .p10k.zsh
       copy:
-        src: "~/devenv/.p10k.zsh"
-        dest: ~/.p10k.zsh
+        src: "{{ ansible_env.HOME }}/devenv/.p10k.zsh"
+        dest: "{{ ansible_env.HOME }}/.p10k.zsh"
         mode: '0644'
 
     - name: Copy tmux conf
       copy:
-        src: "~/devenv/.tmux.conf"
-        dest: ~/.tmux.conf
+        src: "{{ ansible_env.HOME }}/devenv/.tmux.conf"
+        dest: "{{ ansible_env.HOME }}/.tmux.conf"
         mode: '0644'
-        
+
     - name: Copy tmux-sessionizer
       copy:
-        src: "~/devenv/tmux-sessionizer"
-        dest: ~/tmux-sessionizer
+        src: "{{ ansible_env.HOME }}/devenv/tmux-sessionizer"
+        dest: "{{ ansible_env.HOME }}/tmux-sessionizer"
         mode: '0744'
-        
-    #NeoVIM 
+
+    #NeoVIM
     - name: Copy Neovim Configuration
       copy:
-        src: "~/devenv/nvim"
-        dest: ~/.config/ 
-        
-    #Uber's go monorepo setup 
+        src: "{{ ansible_env.HOME }}/devenv/nvim/"
+        dest: "{{ ansible_env.HOME }}/.config/nvim"
+
+    #Uber's go monorepo setup
     - name: Check if the ~/go-code directory exists
       stat:
-        path: "~/go-code"
+        path: "{{ ansible_env.HOME }}/go-code"
       register: dir_status
 
     - name: Copy the file to $HOME/go-code if the directory exists
       copy:
         src: ".gomonorepo.envrc.local"
-        dest: "~/go-code/.envrc.local"
+        dest: "{{ ansible_env.HOME }}/go-code/.envrc.local"
       when: dir_status.stat.exists
 
-  # LLM helpers
+    # LLM helpers
     - name: Check if uv is installed
       command: which uv
       register: uv_check
@@ -114,20 +113,26 @@
       when: uv_check.rc != 0
 
     - name: Check if vectorcode is installed
-      command: uv tool list
+      shell: |
+        export PATH="$HOME/.local/bin:$PATH"
+        uv tool list
       register: vectorcode_check
       failed_when: false
       changed_when: false
 
     - name: Install vectorcode CLI with uv
-      command: uv tool install vectorcode[lsp,mcp] --python python{{ python_version }}
-      when: "'vectorcode' not in vectorcode_check.stdout"
+      shell: |
+        export PATH="$HOME/.local/bin:$PATH"
+        uv tool install 'vectorcode[lsp,mcp]' --python python{{ python_version | default('3.11') }}
+      when: vectorcode_check.rc != 0 or "'vectorcode' not in (vectorcode_check.stdout | default(''))"
 
     - name: Verify vectorcode installation
-      command: vectorcode --version
+      shell: |
+        export PATH="$HOME/.local/bin:$PATH"
+        vectorcode version
       register: vectorcode_version
       changed_when: false
 
     - name: Display vectorcode version
       debug:
-        msg: "VectorCode CLI installed successfully: {{ vectorcode_version.stdout }}"%
+        msg: "VectorCode CLI installed successfully: {{ vectorcode_version.stdout }}"
