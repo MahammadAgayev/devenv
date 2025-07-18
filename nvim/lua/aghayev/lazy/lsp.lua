@@ -102,7 +102,11 @@ return {
         local cmp_select = { behavior = cmp.SelectBehavior.Select }
 
         vim.diagnostic.config({
-            -- update_in_insert = true,
+            virtual_text = true,
+            signs = true,
+            underline = true,
+            update_in_insert = false,
+            severity_sort = true,
             float = {
                 focusable = false,
                 style = "minimal",
