@@ -126,32 +126,8 @@ if command -v tmux &> /dev/null && [ -z "$TMUX" ]; then
   tmux attach-session -t default || tmux new-session -s default
 fi
 
-
-# Uber GenAI
-# Generates ceberus session on init with genai-api.
-#
-
 OPENAI_API_KEY="N/A"
 
-cerberus_auto() {
-SESSION_NAME="cerberus"
-COMMAND="cerberus -s genai-api"
-
-# Check if tmux session exists
-if ! tmux has-session -t "$SESSION_NAME" 2>/dev/null; then
-    echo "Creating tmux session: $SESSION_NAME"
-    tmux new-session -d -s "$SESSION_NAME"
-fi
-
-# Check if the process is running in the session
-if ! tmux capture-pane -pt "$SESSION_NAME" | grep -q "$COMMAND"; then
-    echo "Starting command in tmux: $COMMAND"
-    tmux send-keys -t "$SESSION_NAME" "$COMMAND" C-m
-fi
-}
-
-
-alias cerb_auto="cerberus_auto"
 
 if [[ -f ~/.zshlocal ]]; then
   source ~/.zshlocal
