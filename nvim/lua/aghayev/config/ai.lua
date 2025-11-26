@@ -35,11 +35,11 @@ Always end with:
 ]]
 
 -- VectorCode
-local vectorcode_ctx = require('vectorcode.integrations.copilotchat').make_context_provider({
-  prompt_header = "Here are relevant files from the repository:", -- Customize header text
-  prompt_footer = "\nConsider this context when answering:", -- Customize footer text
-  skip_empty = true, -- Skip adding context when no files are retrieved
-})
+-- local vectorcode_ctx = require('vectorcode.integrations.copilotchat').make_context_provider({
+--   prompt_header = "Here are relevant files from the repository:", -- Customize header text
+--   prompt_footer = "\nConsider this context when answering:", -- Customize footer text
+--   skip_empty = true, -- Skip adding context when no files are retrieved
+-- })
 
 chat.setup({
     model = 'claude-3.7-sonnet',
@@ -58,7 +58,7 @@ chat.setup({
     prompts = {
         Explain = {
             mapping = '<leader>ae',
-            context = { "selection", "vectorcode" },
+            context = { "selection"},
             description = 'AI Explain',
         },
         Review = {
@@ -107,7 +107,6 @@ chat.setup({
         },
     },
     contexts = {
-      vectorcode = vectorcode_ctx
     }
 })
 
@@ -119,13 +118,13 @@ utils.au('BufEnter', {
     end,
 })
 
-vim.keymap.set({ 'n' }, '<leader>aa', chat.toggle, { desc = 'AI Toggle' })
-vim.keymap.set({ 'v' }, '<leader>aa', chat.open, { desc = 'AI Open' })
-vim.keymap.set({ 'n' }, '<leader>ax', chat.reset, { desc = 'AI Reset' })
-vim.keymap.set({ 'n' }, '<leader>as', chat.stop, { desc = 'AI Stop' })
-vim.keymap.set({ 'n' }, '<leader>am', chat.select_model, { desc = 'AI Models' })
-vim.keymap.set({ 'n' }, '<leader>ag', chat.select_agent, { desc = 'AI Agents' })
-vim.keymap.set({ 'n', 'v' }, '<leader>ap', chat.select_prompt, { desc = 'AI Prompts' })
+vim.keymap.set({ 'n' }, '<leader>aa', function() chat.toggle() end, { desc = 'AI Toggle' })
+vim.keymap.set({ 'v' }, '<leader>aa', function() chat.open() end, { desc = 'AI Open' })
+vim.keymap.set({ 'n' }, '<leader>ax', function() chat.reset() end, { desc = 'AI Reset' })
+vim.keymap.set({ 'n' }, '<leader>as', function() chat.stop() end, { desc = 'AI Stop' })
+vim.keymap.set({ 'n' }, '<leader>am', function() chat.select_model() end, { desc = 'AI Models' })
+vim.keymap.set({ 'n' }, '<leader>ag', function() chat.select_agent() end, { desc = 'AI Agents' })
+vim.keymap.set({ 'n', 'v' }, '<leader>ap', function() chat.select_prompt() end, { desc = 'AI Prompts' })
 vim.keymap.set({ 'n', 'v' }, '<leader>aq', function()
     vim.ui.input({
         prompt = 'AI Question> ',
@@ -136,16 +135,6 @@ vim.keymap.set({ 'n', 'v' }, '<leader>aq', function()
     end)
 end, { desc = 'AI Question' })
 
-vim.keymap.set({ 'n' }, '<leader>av', function()
-    local ok, vectorcode = pcall(require, 'vectorcode')
-    if not ok then
-        vim.notify("VectorCode not available", vim.log.levels.ERROR)
-        return
-    end
-
-    vectorcode.vectorise()
-    vim.notify("VectorCode indexing started...", vim.log.levels.INFO)
-end, { desc = 'AI Vectorize Codebase' })
 
 vim.keymap.set({ 'n' }, '<leader>alb', function()
     vim.cmd('vsplit')

@@ -27,36 +27,24 @@ return {
             vim.lsp.protocol.make_client_capabilities(),
             cmp_lsp.default_capabilities())
 
-        require("lspconfig.configs").ulsp = {
-            default_config = {
-                cmd = { "socat", "-", "tcp:localhost:27883,ignoreeof" },
-                flags = {
-                    debounce_text_changes = 1000,
-                },
-                capabilities = vim.lsp.protocol.make_client_capabilities(),
-                filetypes = { "go", "java" },
-                root_dir = function(fname)
-                    local result = require("lspconfig.async").run_command({ "git", "rev-parse", "--show-toplevel" })
-                    if result and result[1] then
-                        return vim.trim(result[1])
-                    end
-                    return require("lspconfig.util").root_pattern(".git")(fname)
-                end,
-                single_file_support = false,
-                docs = {
-                    description = [[
-  uLSP brought to you by the IDE team!
-  By utilizing uLSP in Neovim, you acknowledge that this integration is provided 'as-is' with no warranty, express or implied.
-  We make no guarantees regarding its functionality, performance, or suitability for any purpose, and absolutely no support will be provided.
-  Use at your own risk, and may the code gods have mercy on your soul
-]],
-                },
+        vim.lsp.config.ulsp = {
+            cmd = { "socat", "-", "tcp:localhost:27883,ignoreeof" },
+            flags = {
+                debounce_text_changes = 1000,
             },
+            capabilities = vim.lsp.protocol.make_client_capabilities(),
+            filetypes = { "go", "java" },
+            root_dir = function(fname)
+                local result = vim.system({ "git", "rev-parse", "--show-toplevel" }, { text = true }):wait()
+                if result.code == 0 and result.stdout then
+                    return vim.trim(result.stdout)
+                end
+                return vim.fs.root(fname, ".git")
+            end,
         }
 
-        local lspconfig = require("lspconfig")
+        vim.lsp.enable('ulsp')
 
-        lspconfig['ulsp'].setup({})
         require("fidget").setup({})
         require("mason").setup({})
         require("mason-lspconfig").setup({
@@ -68,7 +56,10 @@ return {
             automatic_enable = false,
         })
 
-        lspconfig.pylsp.setup {
+        vim.lsp.config.pylsp = {
+            cmd = { 'pylsp' },
+            filetypes = { 'python' },
+            root_dir = vim.fs.root(0, {'.git', 'pyproject.toml', 'setup.py'}),
             capabilities = capabilities,
             settings = {
                 pylsp = {
@@ -82,7 +73,10 @@ return {
             }
         }
 
-        lspconfig.lua_ls.setup {
+        vim.lsp.config.lua_ls = {
+            cmd = { 'lua-language-server' },
+            filetypes = { 'lua' },
+            root_dir = vim.fs.root(0, {'.git', '.luarc.json', '.luarc.jsonc'}),
             capabilities = capabilities,
             settings = {
                 Lua = {
@@ -94,10 +88,16 @@ return {
             }
         }
 
-        lspconfig.gopls.setup {
+        vim.lsp.config.gopls = {
+            cmd = { 'gopls' },
+            filetypes = { 'go', 'gomod', 'gowork', 'gotmpl' },
+            root_dir = vim.fs.root(0, {'.git'}),
             capabilities = capabilities,
-            root_dir = lspconfig.util.root_pattern(".git"),
         }
+
+        vim.lsp.enable('pylsp')
+        vim.lsp.enable('lua_ls')
+        vim.lsp.enable('gopls')
 
         local cmp_select = { behavior = cmp.SelectBehavior.Select }
 
