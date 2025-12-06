@@ -3,7 +3,13 @@
     - name: Install packages
       apt:
         name: [ "zsh", "git", "tmux", "fzf", "curl"]
+      become: true
       when: ansible_facts['os_family'] == "RedHat" or ansible_facts['os_family'] == "Debian"
+
+    - name: Install Claude Code
+      shell: curl -fsSL https://claude.ai/install.sh | bash
+      args:
+        executable: /bin/bash
 
 #    - name: Install a package with Homebrew
 #     homebrew:
