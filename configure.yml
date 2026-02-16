@@ -1,7 +1,8 @@
 - hosts: localhost
   vars:
-    devenv_dir: "{{ ansible_env.HOME }}/devenv"
-    zsh_custom: "{{ lookup('env', 'ZSH_CUSTOM') | default(ansible_env.HOME + '/.oh-my-zsh/custom', true) }}"
+    home: "{{ lookup('env', 'HOME') }}"
+    devenv_dir: "{{ lookup('env', 'HOME') }}/devenv"
+    zsh_custom: "{{ lookup('env', 'ZSH_CUSTOM') | default(lookup('env', 'HOME') + '/.oh-my-zsh/custom', true) }}"
 
   tasks:
     # ─── System packages ──────────────────────────────────────────────────────
@@ -24,7 +25,7 @@
 
     - name: Check if Claude Code is installed
       stat:
-        path: "{{ ansible_env.HOME }}/.local/bin/claude"
+        path: "{{ home }}/.local/bin/claude"
       register: claude_status
 
     - name: Install Claude Code
@@ -37,7 +38,7 @@
 
     - name: Ensure home directories exist
       file:
-        path: "{{ ansible_env.HOME }}/{{ item }}"
+        path: "{{ home }}/{{ item }}"
         state: directory
         mode: '0755'
       loop:
@@ -48,23 +49,18 @@
 
     # ─── Shell ────────────────────────────────────────────────────────────────
 
-    - name: Get current shell
-      command: getent passwd {{ ansible_user_id }}
-      register: passwd_entry
-      changed_when: false
-
     - name: Change default shell to zsh
       ansible.builtin.user:
         name: "{{ ansible_user_id }}"
-        shell: "{{ ansible_env.SHELL | default('/usr/bin/zsh') }}"
+        shell: /bin/zsh
       become: true
-      when: passwd_entry.stdout is not search('/zsh')
+      when: lookup('env', 'SHELL') is not search('zsh')
 
     # ─── Oh My Zsh ────────────────────────────────────────────────────────────
 
     - name: Check if Oh My Zsh is installed
       stat:
-        path: "{{ ansible_env.HOME }}/.oh-my-zsh"
+        path: "{{ home }}/.oh-my-zsh"
       register: omz_status
 
     - name: Install Oh My Zsh
@@ -84,14 +80,14 @@
     - name: Install zsh-autosuggestions plugin
       ansible.builtin.git:
         repo: https://github.com/zsh-users/zsh-autosuggestions.git
-        dest: "{{ ansible_env.HOME }}/.oh-my-zsh/plugins/zsh-autosuggestions"
+        dest: "{{ home }}/.oh-my-zsh/plugins/zsh-autosuggestions"
         update: false
 
     # ─── Devenv repo ──────────────────────────────────────────────────────────
 
     - name: Clone devenv repository
       ansible.builtin.git:
-        repo: https://github.com/MahammadAgayev/devenv.git
+        repo: git@github.com:MahammadAgayev/devenv.git
         dest: "{{ devenv_dir }}"
         update: false   # don't overwrite local changes; run git pull manually
 
@@ -100,7 +96,7 @@
     - name: Symlink dotfiles into HOME
       file:
         src: "{{ devenv_dir }}/{{ item.src }}"
-        dest: "{{ ansible_env.HOME }}/{{ item.dest }}"
+        dest: "{{ home }}/{{ item.dest }}"
         state: link
         force: true
       loop:
@@ -111,27 +107,37 @@
 
     - name: Ensure tmux-sessionizer is executable
       file:
-        path: "{{ ansible_env.HOME }}/tmux-sessionizer"
+        path: "{{ home }}/tmux-sessionizer"
         mode: '0755'
+
+    - name: Check if ~/.config/nvim is a real directory (not a symlink)
+      stat:
+        path: "{{ home }}/.config/nvim"
+      register: nvim_stat
+
+    - name: Remove existing nvim config directory before symlinking
+      file:
+        path: "{{ home }}/.config/nvim"
+        state: absent
+      when: nvim_stat.stat.exists and not nvim_stat.stat.islnk
 
     - name: Symlink Neovim config
       file:
         src: "{{ devenv_dir }}/nvim"
-        dest: "{{ ansible_env.HOME }}/.config/nvim"
+        dest: "{{ home }}/.config/nvim"
         state: link
-        force: true
 
     # ─── Optional: go-code envrc ──────────────────────────────────────────────
 
     - name: Check if ~/go-code directory exists
       stat:
-        path: "{{ ansible_env.HOME }}/go-code"
+        path: "{{ home }}/go-code"
       register: gocode_status
 
     - name: Symlink go-code envrc
       file:
         src: "{{ devenv_dir }}/.gomonorepo.envrc.local"
-        dest: "{{ ansible_env.HOME }}/go-code/.envrc.local"
+        dest: "{{ home }}/go-code/.envrc.local"
         state: link
         force: true
       when: gocode_status.stat.exists
