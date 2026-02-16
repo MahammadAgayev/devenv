@@ -1,7 +1,7 @@
 - hosts: localhost
   vars:
     home: "{{ lookup('env', 'HOME') }}"
-    devenv_dir: "{{ lookup('env', 'HOME') }}/devenv"
+    devenv_dir: "{{ playbook_dir }}"
     zsh_custom: "{{ lookup('env', 'ZSH_CUSTOM') | default(lookup('env', 'HOME') + '/.oh-my-zsh/custom', true) }}"
 
   tasks:
