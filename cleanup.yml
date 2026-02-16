@@ -1,0 +1,56 @@
+- hosts: localhost
+  vars:
+    devenv_dir: "{{ ansible_env.HOME }}/devenv"
+    zsh_custom: "{{ lookup('env', 'ZSH_CUSTOM') | default(ansible_env.HOME + '/.oh-my-zsh/custom', true) }}"
+
+  tasks:
+    # ─── Dotfile symlinks ─────────────────────────────────────────────────────
+
+    - name: Remove dotfile symlinks
+      file:
+        path: "{{ ansible_env.HOME }}/{{ item }}"
+        state: absent
+      loop:
+        - .zshrc
+        - .p10k.zsh
+        - .tmux.conf
+        - tmux-sessionizer
+
+    - name: Remove Neovim config symlink
+      file:
+        path: "{{ ansible_env.HOME }}/.config/nvim"
+        state: absent
+
+    - name: Remove go-code envrc symlink
+      file:
+        path: "{{ ansible_env.HOME }}/go-code/.envrc.local"
+        state: absent
+
+    # ─── Zsh plugins/theme ────────────────────────────────────────────────────
+
+    - name: Remove Powerlevel10k theme
+      file:
+        path: "{{ zsh_custom }}/themes/powerlevel10k"
+        state: absent
+
+    - name: Remove zsh-autosuggestions plugin
+      file:
+        path: "{{ ansible_env.HOME }}/.oh-my-zsh/plugins/zsh-autosuggestions"
+        state: absent
+
+    # ─── Oh My Zsh ────────────────────────────────────────────────────────────
+
+    - name: Remove Oh My Zsh
+      file:
+        path: "{{ ansible_env.HOME }}/.oh-my-zsh"
+        state: absent
+
+    # ─── Devenv repo ──────────────────────────────────────────────────────────
+    # Only removes the clone if it was checked out to the default location.
+    # If you cloned it yourself elsewhere, this is a no-op.
+
+    - name: Remove devenv clone (default location only)
+      file:
+        path: "{{ devenv_dir }}"
+        state: absent
+      when: devenv_dir == ansible_env.HOME + '/devenv'

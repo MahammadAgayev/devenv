@@ -52,6 +52,7 @@ return {
                 "lua_ls",
                 "gopls",
                 "pylsp",
+                "zls",
             },
             automatic_enable = false,
         })
@@ -95,9 +96,17 @@ return {
             capabilities = capabilities,
         }
 
+        vim.lsp.config.zls = {
+            cmd = { 'zls' },
+            filetypes = { 'zig', 'zir' },
+            root_dir = vim.fs.root(0, { 'build.zig', 'build.zig.zon', '.git' }),
+            capabilities = capabilities,
+        }
+
         vim.lsp.enable('pylsp')
         vim.lsp.enable('lua_ls')
         vim.lsp.enable('gopls')
+        vim.lsp.enable('zls')
 
         local cmp_select = { behavior = cmp.SelectBehavior.Select }
 

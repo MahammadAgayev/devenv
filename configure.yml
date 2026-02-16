@@ -1,22 +1,41 @@
 - hosts: localhost
+  vars:
+    devenv_dir: "{{ ansible_env.HOME }}/devenv"
+    zsh_custom: "{{ lookup('env', 'ZSH_CUSTOM') | default(ansible_env.HOME + '/.oh-my-zsh/custom', true) }}"
+
   tasks:
-    - name: Install packages
+    # ─── System packages ──────────────────────────────────────────────────────
+
+    - name: Install packages (Debian/RedHat)
       apt:
-        name: [ "zsh", "git", "tmux", "fzf", "curl"]
+        name: ["zsh", "git", "tmux", "fzf", "curl", "neovim"]
+        state: present
+        update_cache: true
       become: true
-      when: ansible_facts['os_family'] == "RedHat" or ansible_facts['os_family'] == "Debian"
+      when: ansible_facts['os_family'] in ["Debian", "RedHat"]
+
+    # - name: Install packages (macOS)
+    #   community.general.homebrew:
+    #     name: ["zsh", "git", "tmux", "fzf", "curl", "neovim"]
+    #     state: present
+    #   when: ansible_facts['system'] == "Darwin"
+
+    # ─── Claude Code ──────────────────────────────────────────────────────────
+
+    - name: Check if Claude Code is installed
+      stat:
+        path: "{{ ansible_env.HOME }}/.local/bin/claude"
+      register: claude_status
 
     - name: Install Claude Code
       shell: curl -fsSL https://claude.ai/install.sh | bash
       args:
         executable: /bin/bash
+      when: not claude_status.stat.exists
 
-#    - name: Install a package with Homebrew
-#     homebrew:
-#       name: [ "zsh", "git", "tmux", "fzf", "curl", "deno"]
-#     when: ansible_facts['ansible_system'] == "Darwin"
+    # ─── Directories ──────────────────────────────────────────────────────────
 
-    - name: Ensure directories exists
+    - name: Ensure home directories exist
       file:
         path: "{{ ansible_env.HOME }}/{{ item }}"
         state: directory
@@ -25,80 +44,94 @@
         - debug
         - any
         - src
-      become: true
-    - name: Change shell
-      shell: chsh -s `which zsh`
-      become: true
+        - .config
 
-    - name: Check if Oh My Zsh is already installed
+    # ─── Shell ────────────────────────────────────────────────────────────────
+
+    - name: Get current shell
+      command: getent passwd {{ ansible_user_id }}
+      register: passwd_entry
+      changed_when: false
+
+    - name: Change default shell to zsh
+      ansible.builtin.user:
+        name: "{{ ansible_user_id }}"
+        shell: "{{ ansible_env.SHELL | default('/usr/bin/zsh') }}"
+      become: true
+      when: passwd_entry.stdout is not search('/zsh')
+
+    # ─── Oh My Zsh ────────────────────────────────────────────────────────────
+
+    - name: Check if Oh My Zsh is installed
       stat:
-        path: "{{ lookup('env', 'ZSH') | default('/home/{{ ansible_user }}/.oh-my-zsh') }}"
-      register: zsh_status
+        path: "{{ ansible_env.HOME }}/.oh-my-zsh"
+      register: omz_status
 
     - name: Install Oh My Zsh
-      shell: curl -L https://raw.github.com/robbyrussell/oh-my-zsh/master/tools/install.sh | sh
+      shell: |
+        curl -fsSL https://raw.github.com/ohmyzsh/ohmyzsh/master/tools/install.sh | sh -s -- --unattended
       args:
         executable: /bin/bash
-      when: not zsh_status.stat.exists
-
-    - name: Check if Powerlevel10k theme is already installed
-      stat:
-        path: "{{ (lookup('env', 'ZSH_CUSTOM') or lookup('env', 'HOME') + '/.oh-my-zsh/custom') + '/themes/powerlevel10k' }}"
-      register: p10k_status
+      when: not omz_status.stat.exists
 
     - name: Install Powerlevel10k theme
-      shell: git clone --depth=1 https://github.com/romkatv/powerlevel10k.git "{{ (lookup('env', 'ZSH_CUSTOM') or lookup('env', 'HOME') + '/.oh-my-zsh/custom') + '/themes/powerlevel10k' }}"
-      when: not p10k_status.stat.exists
+      ansible.builtin.git:
+        repo: https://github.com/romkatv/powerlevel10k.git
+        dest: "{{ zsh_custom }}/themes/powerlevel10k"
+        depth: 1
+        update: false
 
-    - name: Install zsh plugin autosuggestion
+    - name: Install zsh-autosuggestions plugin
       ansible.builtin.git:
         repo: https://github.com/zsh-users/zsh-autosuggestions.git
         dest: "{{ ansible_env.HOME }}/.oh-my-zsh/plugins/zsh-autosuggestions"
+        update: false
 
-    #Below mainly configuration for myself, feel free to use it.
-    - name: Checkout Configuration Files
+    # ─── Devenv repo ──────────────────────────────────────────────────────────
+
+    - name: Clone devenv repository
       ansible.builtin.git:
         repo: https://github.com/MahammadAgayev/devenv.git
-        dest: "{{ ansible_env.HOME }}/devenv"
+        dest: "{{ devenv_dir }}"
+        update: false   # don't overwrite local changes; run git pull manually
 
-    #SHELL
-    - name: Fetch .zshrc
-      copy:
-        src: "{{ ansible_env.HOME }}/devenv/.zshrc"
-        dest: "{{ ansible_env.HOME }}/.zshrc"
-        mode: '0644'
-    - name: Copy .p10k.zsh
-      copy:
-        src: "{{ ansible_env.HOME }}/devenv/.p10k.zsh"
-        dest: "{{ ansible_env.HOME }}/.p10k.zsh"
-        mode: '0644'
+    # ─── Dotfile symlinks ─────────────────────────────────────────────────────
 
-    - name: Copy tmux conf
-      copy:
-        src: "{{ ansible_env.HOME }}/devenv/.tmux.conf"
-        dest: "{{ ansible_env.HOME }}/.tmux.conf"
-        mode: '0644'
+    - name: Symlink dotfiles into HOME
+      file:
+        src: "{{ devenv_dir }}/{{ item.src }}"
+        dest: "{{ ansible_env.HOME }}/{{ item.dest }}"
+        state: link
+        force: true
+      loop:
+        - { src: ".zshrc",           dest: ".zshrc"           }
+        - { src: ".p10k.zsh",        dest: ".p10k.zsh"        }
+        - { src: ".tmux.conf",       dest: ".tmux.conf"       }
+        - { src: "tmux-sessionizer", dest: "tmux-sessionizer" }
 
-    - name: Copy tmux-sessionizer
-      copy:
-        src: "{{ ansible_env.HOME }}/devenv/tmux-sessionizer"
-        dest: "{{ ansible_env.HOME }}/tmux-sessionizer"
-        mode: '0744'
+    - name: Ensure tmux-sessionizer is executable
+      file:
+        path: "{{ ansible_env.HOME }}/tmux-sessionizer"
+        mode: '0755'
 
-    #NeoVIM
-    - name: Copy Neovim Configuration
-      copy:
-        src: "{{ ansible_env.HOME }}/devenv/nvim/"
+    - name: Symlink Neovim config
+      file:
+        src: "{{ devenv_dir }}/nvim"
         dest: "{{ ansible_env.HOME }}/.config/nvim"
+        state: link
+        force: true
 
-    #Uber's go monorepo setup
-    - name: Check if the ~/go-code directory exists
+    # ─── Optional: go-code envrc ──────────────────────────────────────────────
+
+    - name: Check if ~/go-code directory exists
       stat:
         path: "{{ ansible_env.HOME }}/go-code"
-      register: dir_status
+      register: gocode_status
 
-    - name: Copy the file to $HOME/go-code if the directory exists
-      copy:
-        src: ".gomonorepo.envrc.local"
+    - name: Symlink go-code envrc
+      file:
+        src: "{{ devenv_dir }}/.gomonorepo.envrc.local"
         dest: "{{ ansible_env.HOME }}/go-code/.envrc.local"
-      when: dir_status.stat.exists
+        state: link
+        force: true
+      when: gocode_status.stat.exists
