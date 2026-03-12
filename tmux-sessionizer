@@ -12,6 +12,11 @@ has_session() {
 }
 
 hydrate() {
+    if [[ -f "$2/.ssh" ]]; then
+        local ssh_target
+        ssh_target=$(cat "$2/.ssh")
+        tmux send-keys -t $1 "ssh $ssh_target" c-M
+    fi
     if [ -f $2/.tmux-sessionizer ]; then
         tmux send-keys -t $1 "source $2/.tmux-sessionizer" c-M
     elif [ -f $HOME/.tmux-sessionizer ]; then
