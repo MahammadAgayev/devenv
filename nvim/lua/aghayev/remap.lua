@@ -65,9 +65,9 @@ end)
 vim.keymap.set("n", "<leader>tr", "<cmd>belowright split | term<CR>")
 vim.keymap.set("n", "<leader>tc", "<cmd>belowright split | lcd %:p:h | term<CR>")
 
--- exit terminal mode
+-- exit terminal mode (only via jk, not Esc)
 vim.keymap.set("t", "jk", "<C-\\><C-n>")
-vim.keymap.set("t", "<C-[><C-[>", "<C-\\><C-n>")
+vim.keymap.set("t", "<Esc>", "<Esc>", { noremap = true })
 
 -- buffer navigation
 vim.keymap.set("n", "<leader>bn", "<cmd>bn<CR>")

@@ -1,4 +1,11 @@
-# Claude Code Guidelines
+# Mahammad's workflow/guidelines
+
+## Principles
+- Being simple and efficient.
+- The favorite engineer - Linus Torvalds
+- Love the simple abstraction of "everything is file in linux", "everything is buffer in neovim"
+- I hate writing more 70 lines of code for doing a change into existing system.
+
 
 ## Bash Commands
 - Never chain commands with `&&`, `||`, or `;` — use single commands only.

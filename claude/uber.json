@@ -1,5 +1,4 @@
 {
-  "apiKeyHelper": "/home/user/.local/share/aifx/bin/claude-genai-token-helper",
   "effortLevel": "low",
   "enabledMcpjsonServers": [
     "code-mcp"
@@ -16,14 +15,13 @@
   "extraKnownMarketplaces": {
     "uber-code/devexp-agent-marketplace": {
       "source": {
-        "path": "/home/user/.local/share/aifx/marketplaces/uber-code/devexp-agent-marketplace",
+        "path": "~/.local/share/aifx/marketplaces/uber-code/devexp-agent-marketplace",
         "source": "directory"
       }
     }
   },
   "fastMode": false,
   "model": "opus",
-  "otelHeadersHelper": "/home/user/.local/share/aifx/bin/claude-telemetry-token-helper",
   "permissions": {
     "allow": [
       "Bash(basename *)",
