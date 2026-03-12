@@ -30,17 +30,30 @@ return {
         vim.lsp.config.ulsp = {
             cmd = { "socat", "-", "tcp:localhost:27883,ignoreeof" },
             flags = {
-                debounce_text_changes = 1000,
+                debounce_text_changes = 300, -- Optimized from 1000ms
             },
-            capabilities = vim.lsp.protocol.make_client_capabilities(),
+            capabilities = capabilities,
             filetypes = { "go", "java" },
-            root_dir = function(fname)
-                local result = vim.system({ "git", "rev-parse", "--show-toplevel" }, { text = true }):wait()
-                if result.code == 0 and result.stdout then
-                    return vim.trim(result.stdout)
-                end
-                return vim.fs.root(fname, ".git")
+            root_dir = vim.fs.root(0, { '.git' }),
+            single_file_support = false,
+            on_attach = function(client, bufnr)
+                -- Suppress connection error messages
+                client.config.on_error = function() end
             end,
+            handlers = {
+                -- Suppress window/showMessage notifications
+                ["window/showMessage"] = function() end,
+                -- Uncomment to suppress log messages if needed
+                -- ["window/logMessage"] = function() end,
+            },
+            docs = {
+                description = [[
+                    uLSP brought to you by the IDE team!
+                    By utilizing uLSP in Neovim, you acknowledge that this integration is provided 'as-is' with no warranty, express or implied.
+                    We make no guarantees regarding its functionality, performance, or suitability for any purpose, and absolutely no support will be provided.
+                    Use at your own risk, and may the code gods have mercy on your soul
+                ]],
+            },
         }
 
         vim.lsp.enable('ulsp')

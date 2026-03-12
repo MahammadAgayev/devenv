@@ -61,9 +61,15 @@ vim.keymap.set("n", "<leader><leader>", function()
     vim.cmd("so")
 end)
 
--- open terminal
-vim.keymap.set("n", "<leader>tr", "<cmd>belowright vsplit | term<CR>")
-vim.keymap.set("n", "<leader>tc", "<cmd>belowright vsplit | lcd %:p:h | term<CR>")
+-- open terminal (bottom)
+vim.keymap.set("n", "<leader>tr", "<cmd>belowright split | term<CR>")
+vim.keymap.set("n", "<leader>tc", "<cmd>belowright split | lcd %:p:h | term<CR>")
 
--- return to normal mode in terminal
-vim.keymap.set('t', '<Esc><Esc>', [[<C-\><C-n>]], { noremap = true, silent = true })
+-- exit terminal mode
+vim.keymap.set("t", "jk", "<C-\\><C-n>")
+vim.keymap.set("t", "<C-[><C-[>", "<C-\\><C-n>")
+
+-- buffer navigation
+vim.keymap.set("n", "<leader>bn", "<cmd>bn<CR>")
+vim.keymap.set("n", "<leader>bp", "<cmd>bp<CR>")
+vim.keymap.set("n", "<leader>bd", "<cmd>bd<CR>")

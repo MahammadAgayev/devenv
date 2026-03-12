@@ -7,13 +7,13 @@
   tasks:
     # ─── System packages ──────────────────────────────────────────────────────
 
-    - name: Install packages (Debian/RedHat)
-      apt:
-        name: ["zsh", "git", "tmux", "fzf", "curl", "neovim"]
-        state: present
-        update_cache: true
-      become: true
-      when: ansible_facts['os_family'] in ["Debian", "RedHat"]
+    # - name: Install packages (Debian/RedHat)
+    #   apt:
+    #     name: ["zsh", "git", "tmux", "fzf", "curl", "neovim"]
+    #     state: present
+    #     update_cache: true
+    #   become: true
+    #   when: ansible_facts['os_family'] in ["Debian", "RedHat"]
 
     # - name: Install packages (macOS)
     #   community.general.homebrew:
@@ -23,73 +23,71 @@
 
     # ─── Claude Code ──────────────────────────────────────────────────────────
 
-    - name: Check if Claude Code is installed
-      stat:
-        path: "{{ home }}/.local/bin/claude"
-      register: claude_status
-
-    - name: Install Claude Code
-      shell: curl -fsSL https://claude.ai/install.sh | bash
-      args:
-        executable: /bin/bash
-      when: not claude_status.stat.exists
+    # - name: Check if Claude Code is installed
+    #   stat:
+    #     path: "{{ home }}/.local/bin/claude"
+    #   register: claude_status
+    #
+    # - name: Install Claude Code
+    #   shell: curl -fsSL https://claude.ai/install.sh | bash
+    #   args:
+    #     executable: /bin/bash
+    #   when: not claude_status.stat.exists
 
     # ─── Directories ──────────────────────────────────────────────────────────
 
-    - name: Ensure home directories exist
-      file:
-        path: "{{ home }}/{{ item }}"
-        state: directory
-        mode: '0755'
-      loop:
-        - debug
-        - any
-        - src
-        - .config
+    # - name: Ensure home directories exist
+    #   file:
+    #     path: "{{ home }}/{{ item }}"
+    #     state: directory
+    #     mode: '0755'
+    #   loop:
+    #     - default
+    #     - .config
 
     # ─── Shell ────────────────────────────────────────────────────────────────
 
-    - name: Change default shell to zsh
-      ansible.builtin.user:
-        name: "{{ ansible_user_id }}"
-        shell: /bin/zsh
-      become: true
-      when: lookup('env', 'SHELL') is not search('zsh')
-
+    # - name: Change default shell to zsh
+    #   ansible.builtin.user:
+    #     name: "{{ ansible_user_id }}"
+    #     shell: /bin/zsh
+    #   become: true
+    #   when: lookup('env', 'SHELL') is not search('zsh')
+    #
     # ─── Oh My Zsh ────────────────────────────────────────────────────────────
 
-    - name: Check if Oh My Zsh is installed
-      stat:
-        path: "{{ home }}/.oh-my-zsh"
-      register: omz_status
-
-    - name: Install Oh My Zsh
-      shell: |
-        curl -fsSL https://raw.github.com/ohmyzsh/ohmyzsh/master/tools/install.sh | sh -s -- --unattended
-      args:
-        executable: /bin/bash
-      when: not omz_status.stat.exists
-
-    - name: Install Powerlevel10k theme
-      ansible.builtin.git:
-        repo: https://github.com/romkatv/powerlevel10k.git
-        dest: "{{ zsh_custom }}/themes/powerlevel10k"
-        depth: 1
-        update: false
-
-    - name: Install zsh-autosuggestions plugin
-      ansible.builtin.git:
-        repo: https://github.com/zsh-users/zsh-autosuggestions.git
-        dest: "{{ home }}/.oh-my-zsh/plugins/zsh-autosuggestions"
-        update: false
+    # - name: Check if Oh My Zsh is installed
+    #   stat:
+    #     path: "{{ home }}/.oh-my-zsh"
+    #   register: omz_status
+    #
+    # - name: Install Oh My Zsh
+    #   shell: |
+    #     curl -fsSL https://raw.github.com/ohmyzsh/ohmyzsh/master/tools/install.sh | sh -s -- --unattended
+    #   args:
+    #     executable: /bin/bash
+    #   when: not omz_status.stat.exists
+    #
+    # - name: Install Powerlevel10k theme
+    #   ansible.builtin.git:
+    #     repo: https://github.com/romkatv/powerlevel10k.git
+    #     dest: "{{ zsh_custom }}/themes/powerlevel10k"
+    #     depth: 1
+    #     update: false
+    #
+    # - name: Install zsh-autosuggestions plugin
+    #   ansible.builtin.git:
+    #     repo: https://github.com/zsh-users/zsh-autosuggestions.git
+    #     dest: "{{ home }}/.oh-my-zsh/plugins/zsh-autosuggestions"
+    #     update: false
 
     # ─── Devenv repo ──────────────────────────────────────────────────────────
 
-    - name: Clone devenv repository
-      ansible.builtin.git:
-        repo: git@github.com:MahammadAgayev/devenv.git
-        dest: "{{ devenv_dir }}"
-        update: false   # don't overwrite local changes; run git pull manually
+    # - name: Clone devenv repository
+    #   ansible.builtin.git:
+    #     repo: git@github.com:MahammadAgayev/devenv.git
+    #     dest: "{{ devenv_dir }}"
+    #     update: false   # don't overwrite local changes; run git pull manually
 
     # ─── Dotfile symlinks ─────────────────────────────────────────────────────
 
@@ -127,6 +125,39 @@
         dest: "{{ home }}/.config/nvim"
         state: link
 
+    # ─── Claude Code (Uber) ────────────────────────────────────────────────────
+
+    - name: Ensure ~/.claude directory exists
+      file:
+        path: "{{ home }}/.claude"
+        state: directory
+        mode: '0755'
+
+    - name: Symlink Claude Code settings (Uber)
+      file:
+        src: "{{ devenv_dir }}/claude/uber.json"
+        dest: "{{ home }}/.claude/settings.json"
+        state: link
+        force: true
+      when: profile | default('uber') == 'uber'
+
+    - name: Symlink CLAUDE.md globally
+      file:
+        src: "{{ devenv_dir }}/claude/CLAUDE.md"
+        dest: "{{ home }}/.claude/CLAUDE.md"
+        state: link
+        force: true
+
+    # ─── Claude Code (Personal) ─────────────────────────────────────────────
+
+    - name: Symlink Claude Code settings (Personal)
+      file:
+        src: "{{ devenv_dir }}/claude/personal.json"
+        dest: "{{ home }}/.claude/settings.json"
+        state: link
+        force: true
+      when: profile | default('uber') == 'personal'
+
     # ─── Optional: go-code envrc ──────────────────────────────────────────────
 
     - name: Check if ~/go-code directory exists
@@ -140,4 +171,4 @@
         dest: "{{ home }}/go-code/.envrc.local"
         state: link
         force: true
-      when: gocode_status.stat.exists
+      when: gocode_status.stat.exists and profile | default('uber') == 'uber'

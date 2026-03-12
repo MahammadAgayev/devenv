@@ -1,0 +1,52 @@
+{
+  "enabledPlugins": {
+    "gopls-lsp@claude-plugins-official": true,
+    "lua-lsp@claude-plugins-official": true
+  },
+  "env": {
+    "ENABLE_TOOL_SEARCH": "false"
+  },
+  "fastMode": false,
+  "model": "opus",
+  "permissions": {
+    "allow": [
+      "Bash(basename *)",
+      "Bash(cat *)",
+      "Bash(cut *)",
+      "Bash(date *)",
+      "Bash(diff *)",
+      "Bash(dirname *)",
+      "Bash(du *)",
+      "Bash(echo *)",
+      "Bash(env)",
+      "Bash(file *)",
+      "Bash(find *)",
+      "Bash(git -C * diff *)",
+      "Bash(git -C * log *)",
+      "Bash(git -C * status *)",
+      "Bash(git diff *)",
+      "Bash(git log *)",
+      "Bash(git status *)",
+      "Bash(grep *)",
+      "Bash(head *)",
+      "Bash(jq *)",
+      "Bash(ls *)",
+      "Bash(printenv *)",
+      "Bash(pwd)",
+      "Bash(realpath *)",
+      "Bash(sort *)",
+      "Bash(stat *)",
+      "Bash(tail *)",
+      "Bash(test *)",
+      "Bash(tree *)",
+      "Bash(uniq *)",
+      "Bash(wc *)",
+      "Bash(which *)",
+      "WebFetch"
+    ],
+    "deny": [
+      "Bash(git commit *)",
+      "Bash(git push *)"
+    ]
+  }
+}
