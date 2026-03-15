@@ -6,7 +6,7 @@ return {
     config = function()
         require("claude-code").setup({
             -- Command configuration
-            command = "aifx agent run claude",
+            command = vim.fn.executable("aifx") == 1 and "aifx agent run claude" or "claude", -- aifx is uber-specific
 
             -- Window configuration
             window = {
