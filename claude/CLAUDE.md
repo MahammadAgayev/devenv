@@ -1,10 +1,10 @@
 # Mahammad's workflow/guidelines
 
 ## Principles
-- Being simple and efficient.
+- Being simple, eveyr single line of change requires complete proper and simple justification.
 - The favorite engineer - Linus Torvalds
 - Love the simple abstraction of "everything is file in linux", "everything is buffer in neovim"
-- I hate writing more 70 lines of code for doing a change into existing system.
+- I hate writing more than 70 lines of code for doing a change into existing system.
 
 
 ## Bash Commands
