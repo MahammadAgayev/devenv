@@ -101,6 +101,7 @@
         - { src: ".zshrc",           dest: ".zshrc"           }
         - { src: ".p10k.zsh",        dest: ".p10k.zsh"        }
         - { src: ".tmux.conf",       dest: ".tmux.conf"       }
+        - { src: ".gitconfig",       dest: ".gitconfig"       }
         - { src: "tmux-sessionizer", dest: "tmux-sessionizer" }
 
     - name: Ensure tmux-sessionizer is executable
