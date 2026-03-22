@@ -149,6 +149,21 @@
         state: link
         force: true
 
+    - name: Ensure ~/.claude/commands directory exists
+      file:
+        path: "{{ home }}/.claude/commands"
+        state: directory
+        mode: '0755'
+
+    - name: Symlink Claude commands
+      file:
+        src: "{{ devenv_dir }}/claude/commands/{{ item }}"
+        dest: "{{ home }}/.claude/commands/{{ item }}"
+        state: link
+        force: true
+      with_fileglob:
+        - "{{ devenv_dir }}/claude/commands/*.md"
+
     # ─── Claude Code (Personal) ─────────────────────────────────────────────
 
     - name: Symlink Claude Code settings (Personal)
