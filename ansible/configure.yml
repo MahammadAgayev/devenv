@@ -1,4 +1,5 @@
 - hosts: localhost
+  connection: local
   vars:
     home: "{{ lookup('env', 'HOME') }}"
     devenv: "{{ playbook_dir | dirname }}"

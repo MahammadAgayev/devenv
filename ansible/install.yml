@@ -1,4 +1,5 @@
 - hosts: localhost
+  connection: local
   vars:
     home: "{{ lookup('env', 'HOME') }}"
     zsh_custom: "{{ lookup('env', 'ZSH_CUSTOM') | default(home + '/.oh-my-zsh/custom', true) }}"
