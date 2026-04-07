@@ -52,7 +52,6 @@ def get_workspace():
 
 def run_playbook(playbook, profile, workspace):
     cmd = ["ansible-playbook", os.path.join(DEVENV_DIR, "ansible", playbook), "-e", f"profile={profile}", "-e", f"workspace={workspace}"]
-    print(cmd)
     return subprocess.run(cmd).returncode
 
 
