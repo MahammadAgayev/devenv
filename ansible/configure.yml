@@ -4,7 +4,7 @@
     home: "{{ lookup('env', 'HOME') }}"
     devenv: "{{ playbook_dir | dirname }}"
     profile: "{{ profile | default('uber') }}"
-    environment: "{{ environment | default('local') }}"
+    workspace: "{{ workspace | default('local') }}"
 
   tasks:
     - name: Symlink dotfiles
@@ -72,14 +72,14 @@
         dest: "{{ home }}/go-code/.envrc.local"
         state: link
         force: true
-      when: profile == 'uber' and environment == 'go-devpod'
+      when: profile == 'uber' and workspace == 'go-devpod'
 
     - name: Ensure ~/ulsp exists (uber + go-devpod only)
       file:
         path: "{{ home }}/ulsp"
         state: directory
         mode: '0755'
-      when: profile == 'uber' and environment == 'go-devpod'
+      when: profile == 'uber' and workspace == 'go-devpod'
 
     - name: Symlink ulsp.sh (uber + go-devpod only)
       file:
@@ -88,7 +88,7 @@
         state: link
         force: true
         mode: '0755'
-      when: profile == 'uber' and environment == 'go-devpod'
+      when: profile == 'uber' and workspace == 'go-devpod'
 
     - name: Install devenv post-merge hook
       file:

@@ -36,44 +36,45 @@ def get_profile():
     return config["profile"]
 
 
-def get_environment():
+def get_workspace():
     config = load_config()
-    if "environment" not in config:
-        print("No environment configured. Choose one:")
+    if "workspace" not in config:
+        print("No workspace configured. Choose one:")
         print("  1) local (default)")
         print("  2) go-devpod")
         choice = input("Enter 1 or 2: ").strip()
-        environment = "go-devpod" if choice == "2" else "local"
-        config["environment"] = environment
+        workspace = "go-devpod" if choice == "2" else "local"
+        config["workspace"] = workspace
         save_config(config)
-        print(f"Saved environment: {environment}")
-    return config["environment"]
+        print(f"Saved workspace: {workspace}")
+    return config["workspace"]
 
 
-def run_playbook(playbook, profile, environment):
-    cmd = ["ansible-playbook", os.path.join(DEVENV_DIR, "ansible", playbook), "-e", f"profile={profile}", "-e", f"environment={environment}"]
+def run_playbook(playbook, profile, workspace):
+    cmd = ["ansible-playbook", os.path.join(DEVENV_DIR, "ansible", playbook), "-e", f"profile={profile}", "-e", f"workspace={workspace}"]
+    print(cmd)
     return subprocess.run(cmd).returncode
 
 
 def cmd_sync(args):
     profile = get_profile()
-    environment = get_environment()
-    return run_playbook("configure.yml", profile, environment)
+    workspace = get_workspace()
+    return run_playbook("configure.yml", profile, workspace)
 
 
 def cmd_install(args):
     profile = get_profile()
-    environment = get_environment()
-    return run_playbook("install.yml", profile, environment)
+    workspace = get_workspace()
+    return run_playbook("install.yml", profile, workspace)
 
 
 def cmd_all(args):
     profile = get_profile()
-    environment = get_environment()
-    rc = run_playbook("configure.yml", profile, environment)
+    workspace = get_workspace()
+    rc = run_playbook("configure.yml", profile, workspace)
     if rc != 0:
         return rc
-    return run_playbook("install.yml", profile, environment)
+    return run_playbook("install.yml", profile, workspace)
 
 
 def cmd_config(args):
@@ -82,10 +83,10 @@ def cmd_config(args):
         config["profile"] = args.profile
         save_config(config)
         print(f"Profile set to: {args.profile}")
-    elif args.environment:
-        config["environment"] = args.environment
+    elif args.workspace:
+        config["workspace"] = args.workspace
         save_config(config)
-        print(f"Environment set to: {args.environment}")
+        print(f"Workspace set to: {args.workspace}")
     else:
         print(json.dumps(config, indent=2))
     return 0
@@ -101,7 +102,7 @@ def main():
 
     config_parser = subparsers.add_parser("config", help="Show/set config")
     config_parser.add_argument("--profile", choices=["uber", "personal"], help="Set profile")
-    config_parser.add_argument("--environment", choices=["local", "go-devpod"], help="Set environment")
+    config_parser.add_argument("--workspace", choices=["local", "go-devpod"], help="Set workspace")
 
     args = parser.parse_args()
 
