@@ -13,7 +13,7 @@
 
     - name: Install packages (Linux)
       apt:
-        name: [zsh, git, tmux, fzf, curl, neovim]
+        name: [zsh, git, tmux, fzf, curl]
         state: present
         update_cache: true
       become: true
