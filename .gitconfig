@@ -1,28 +1,8 @@
+[gpg]
+	format = x509
+[gpg "x509"]
+	program = /opt/uber/bin/signingfx
 [user]
-	name = Mahammad Aghayev
-	email = mahammadmaghayev@gmail.com
-
-[alias]
-	# Compact log format
-	l = log --pretty=format:\"%h - %an, %ar : %s\"
-
-	# Short status without untracked files (monorepo friendly)
-	st = status -uno --short
-
-	# Show log with graph
-	lg = log --graph --pretty=format:\"%h - %an, %ar : %s\" --abbrev-commit
-
-	# Show last commit
-	last = log -1 HEAD --stat
-
-	# List aliases
-	aliases = config --get-regexp alias
-
-	# Show diff of staged changes
-	staged = diff --cached
-
-	# Discard changes in working directory
-	undo = restore
-
-	# Undo last commit but keep changes
-	uncommit = reset HEAD~1 --mixed
+	signingkey = 
+[commit]
+	gpgsign = true

@@ -1,27 +1,7 @@
 {
-  "effortLevel": "low",
-  "enabledMcpjsonServers": [
-    "code-mcp"
-  ],
-  "enabledPlugins": {
-    "gopls-lsp@claude-plugins-official": true,
-    "lua-lsp@claude-plugins-official": true,
-    "uber-dev@agent-marketplace": true,
-    "uber-reviewer@agent-marketplace": true
-  },
   "env": {
     "ENABLE_TOOL_SEARCH": "false"
   },
-  "extraKnownMarketplaces": {
-    "uber-code/devexp-agent-marketplace": {
-      "source": {
-        "path": "~/.local/share/aifx/marketplaces/uber-code/devexp-agent-marketplace",
-        "source": "directory"
-      }
-    }
-  },
-  "fastMode": false,
-  "model": "opus",
   "permissions": {
     "allow": [
       "Bash(basename *)",
@@ -64,10 +44,30 @@
       "mcp__monorepo-experts-mcp-server__update_build_files",
       "mcp__monorepo-experts-mcp-server__get_coverage_report"
     ],
-    "defaultMode": "default",
     "deny": [
       "Bash(git commit *)",
       "Bash(git push *)"
-    ]
-  }
+    ],
+    "defaultMode": "default"
+  },
+  "model": "opus",
+  "enabledMcpjsonServers": [
+    "code-mcp"
+  ],
+  "enabledPlugins": {
+    "gopls-lsp@claude-plugins-official": true,
+    "lua-lsp@claude-plugins-official": true,
+    "uber-dev@agent-marketplace": true,
+    "uber-reviewer@agent-marketplace": true
+  },
+  "extraKnownMarketplaces": {
+    "uber-code/devexp-agent-marketplace": {
+      "source": {
+        "source": "directory",
+        "path": "~/.local/share/aifx/marketplaces/uber-code/devexp-agent-marketplace"
+      }
+    }
+  },
+  "effortLevel": "low",
+  "fastMode": false
 }

@@ -1,0 +1,54 @@
+- hosts: localhost
+  vars:
+    home: "{{ lookup('env', 'HOME') }}"
+    devenv: "{{ playbook_dir | dirname }}"
+    profile: "{{ profile | default('uber') }}"
+    environment: "{{ environment | default('local') }}"
+
+  tasks:
+    - name: Symlink dotfiles
+      file:
+        src: "{{ devenv }}/dotfiles/{{ item.src }}"
+        dest: "{{ home }}/{{ item.dest }}"
+        state: link
+        force: true
+      loop:
+        - { src: ".zshrc",     dest: ".zshrc" }
+        - { src: ".p10k.zsh",  dest: ".p10k.zsh" }
+        - { src: ".tmux.conf", dest: ".tmux.conf" }
+        - { src: ".gitconfig", dest: ".gitconfig" }
+
+    - name: Symlink .gitconfig_uber (uber only)
+      file: { src: "{{ devenv }}/dotfiles/.gitconfig_uber", dest: "{{ home }}/.gitconfig_uber", state: link, force: true }
+      when: profile == 'uber'
+
+    - name: Symlink tmux-sessionizer
+      file: { src: "{{ devenv }}/scripts/tmux-sessionizer", dest: "{{ home }}/tmux-sessionizer", state: link, force: true, mode: '0755' }
+
+    - name: Symlink nvim config
+      file: { src: "{{ devenv }}/nvim", dest: "{{ home }}/.config/nvim", state: link, force: true }
+
+    - name: Ensure ~/.claude exists
+      file: { path: "{{ home }}/.claude", state: directory, mode: '0755' }
+
+    - name: Symlink Claude settings
+      file:
+        src: "{{ devenv }}/claude/{{ profile }}.json"
+        dest: "{{ home }}/.claude/settings.json"
+        state: link
+        force: true
+
+    - name: Symlink CLAUDE.md
+      file: { src: "{{ devenv }}/claude/CLAUDE.md", dest: "{{ home }}/.claude/CLAUDE.md", state: link, force: true }
+
+    - name: Symlink go-code envrc (uber + go-devpod only)
+      file: { src: "{{ devenv }}/dotfiles/.gomonorepo.envrc.local", dest: "{{ home }}/go-code/.envrc.local", state: link, force: true }
+      when: profile == 'uber' and environment == 'go-devpod'
+
+    - name: Ensure ~/ulsp exists (uber + go-devpod only)
+      file: { path: "{{ home }}/ulsp", state: directory, mode: '0755' }
+      when: profile == 'uber' and environment == 'go-devpod'
+
+    - name: Symlink ulsp.sh (uber + go-devpod only)
+      file: { src: "{{ devenv }}/scripts/ulsp.sh", dest: "{{ home }}/ulsp/ulsp.sh", state: link, force: true, mode: '0755' }
+      when: profile == 'uber' and environment == 'go-devpod'

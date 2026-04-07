@@ -1,0 +1,55 @@
+[user]
+	name = Mahammad Aghayev
+	email = mahammadmaghayev@gmail.com
+	signingkey =
+
+[alias]
+    lg = log --graph --pretty=format:'%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%ar) %C(bold blue)<%an>%Creset'
+    lg-notags = log --graph --pretty=format:'%Cred%h%Creset - %s %Cgreen(%ar) %C(bold blue)<%an>%Creset'
+    s = status -uno
+	last = log -1 HEAD --stat
+	aliases = config --get-regexp alias
+	staged = diff --cached
+	undo = restore
+	uncommit = reset HEAD~1 --mixed
+	branches = branch -vv
+
+[log]
+    # Show a shorter but still unique commit hash
+    abbrevCommit = true
+    # Show git log times in my own time zone
+    date = local
+    # Follow file renames when running git log on a file
+    follow = true
+
+[core]
+	pager = less -x4
+
+[fetch]
+	prune = true
+	prunetags = true
+    writeCommitGraph = true
+    parallel = 0
+
+[pull]
+	rebase = true
+
+[branch]
+	sort = -committerdate
+
+[rebase]
+	autostash = true
+
+[merge]
+	conflictstyle = diff3
+
+[diff]
+	algorithm = histogram
+	colorMoved = default
+
+[rerere]
+	enabled = true
+
+# Override all with uber config
+[include]
+	path = ~/.gitconfig_uber

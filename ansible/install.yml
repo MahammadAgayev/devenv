@@ -1,0 +1,40 @@
+- hosts: localhost
+  vars:
+    home: "{{ lookup('env', 'HOME') }}"
+    zsh_custom: "{{ lookup('env', 'ZSH_CUSTOM') | default(home + '/.oh-my-zsh/custom', true) }}"
+
+  tasks:
+    - name: Install packages (macOS)
+      community.general.homebrew:
+        name: [zsh, git, tmux, fzf, curl, neovim]
+        state: present
+      when: ansible_facts['system'] == 'Darwin'
+
+    - name: Install packages (Linux)
+      apt:
+        name: [zsh, git, tmux, fzf, curl, neovim]
+        state: present
+        update_cache: true
+      become: true
+      when: ansible_facts['os_family'] in ['Debian', 'RedHat']
+
+    - name: Check Oh My Zsh installed
+      stat: { path: "{{ home }}/.oh-my-zsh" }
+      register: omz
+
+    - name: Install Oh My Zsh
+      shell: curl -fsSL https://raw.github.com/ohmyzsh/ohmyzsh/master/tools/install.sh | sh -s -- --unattended
+      when: not omz.stat.exists
+
+    - name: Install Powerlevel10k
+      git:
+        repo: https://github.com/romkatv/powerlevel10k.git
+        dest: "{{ zsh_custom }}/themes/powerlevel10k"
+        depth: 1
+        update: false
+
+    - name: Install zsh-autosuggestions
+      git:
+        repo: https://github.com/zsh-users/zsh-autosuggestions.git
+        dest: "{{ home }}/.oh-my-zsh/plugins/zsh-autosuggestions"
+        update: false
