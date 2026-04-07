@@ -1,7 +1,7 @@
 return {
     "tpope/vim-fugitive",
     config = function()
-        vim.keymap.set("n", "<leader>gs", vim.cmd.Git)
+        vim.keymap.set("n", "<leader>gs", function() vim.cmd.Git('-uno') end)
 
         local aghayev_Fugitive = vim.api.nvim_create_augroup("aghayev_Fugitive", {})
 
