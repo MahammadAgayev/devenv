@@ -5,7 +5,7 @@ return {
         require("nvim-treesitter").setup({
             ensure_installed = {
                 "vimdoc", "javascript", "typescript", "c", "lua", "rust",
-                "jsdoc", "bash", "zig",
+                "jsdoc", "bash", "zig", "templ",
             },
             auto_install = true,
         })
@@ -31,18 +31,6 @@ return {
                 end
             end,
         })
-
-        -- templ custom parser
-        local ok, parser_config = pcall(require, "nvim-treesitter.parsers")
-        if ok then
-            parser_config.get_parser_configs().templ = {
-                install_info = {
-                    url = "https://github.com/vrischmann/tree-sitter-templ.git",
-                    files = { "src/parser.c", "src/scanner.c" },
-                    branch = "master",
-                },
-            }
-        end
 
         vim.treesitter.language.register("templ", "templ")
     end,
