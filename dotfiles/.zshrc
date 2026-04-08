@@ -114,6 +114,30 @@ source $ZSH/oh-my-zsh.sh
 bindkey -s ^f "$HOME/tmux-sessionizer\n"
 
 alias vim="nvim"
+
+# SSH into a host and open a named tmux window for it
+tssh() {
+  local name skip_next=0
+  for arg in "$@"; do
+    if (( skip_next )); then skip_next=0; continue; fi
+    [[ "$arg" == -[bcDEeFIiJLlmopQRSwW] ]] && { skip_next=1; continue; }
+    [[ "$arg" == -* ]] && continue
+    name="${arg##*@}"
+    name="${name//[.:]/-}"
+    break
+  done
+
+  if [[ -n "$name" ]]; then
+    tmux new-session -d -s "$name" "ssh $*" 2>/dev/null
+    if [[ -n "$TMUX" ]]; then
+      tmux switch-client -t "$name"
+    else
+      tmux attach-session -t "$name"
+    fi
+  else
+    ssh "$@"
+  fi
+}
 #Default unix editor
 export VISUAL=nvim
 export EDITOR="$VISUAL"

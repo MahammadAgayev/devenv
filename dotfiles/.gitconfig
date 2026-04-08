@@ -6,7 +6,7 @@
 [alias]
     lg = log --graph --pretty=format:'%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%ar) %C(bold blue)<%an>%Creset'
     lg-notags = log --graph --pretty=format:'%Cred%h%Creset - %s %Cgreen(%ar) %C(bold blue)<%an>%Creset'
-    s = status -uno
+    s = status -uno --short
 	last = log -1 HEAD --stat
 	aliases = config --get-regexp alias
 	staged = diff --cached
@@ -21,6 +21,9 @@
     date = local
     # Follow file renames when running git log on a file
     follow = true
+
+[status]
+    showUntrackedFiles = no
 
 [core]
 	pager = less -x4
