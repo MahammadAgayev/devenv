@@ -50,18 +50,25 @@ def cmd_sync(args):
     config = load_config()
     targets = resolve_targets(config, args.names)
 
-    if args.all:
-        post_pull = " && python3 sync.py all"
-    elif args.configure:
+    if args.configure:
         post_pull = " && python3 sync.py sync"
     else:
         post_pull = ""
+
+    clone_url = "https://github.com/MahammadAgayev/devenv"
 
     failed = []
     for name, info in targets.items():
         host = info["host"]
         path = info.get("path", "~/devenv")
-        cmd = f"cd {path} && git pull{post_pull}"
+        if args.all:
+            cmd = (
+                f"if [ -d {path} ]; then cd {path} && git pull; "
+                f"else git clone {clone_url} {path}; fi "
+                f"&& cd {path} && python3 sync.py all"
+            )
+        else:
+            cmd = f"cd {path} && git pull{post_pull}"
         if DEBUG:
             print(f"{BOLD}[{name}]{RESET} {host} → {cmd}")
         capture = not DEBUG
