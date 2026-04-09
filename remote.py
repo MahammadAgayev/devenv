@@ -46,6 +46,80 @@ def resolve_targets(config, names):
     return {n: remotes[n] for n in names}
 
 
+def _merge_zsh_history(lines):
+    """Merge zsh history lines, deduplicating by command text."""
+    extended = {}  # cmd -> (timestamp, elapsed)
+    plain = []
+
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        if line.startswith(": "):
+            try:
+                rest = line[2:]
+                colon_idx = rest.index(":")
+                semi_idx = rest.index(";", colon_idx)
+                ts = int(rest[:colon_idx])
+                elapsed = rest[colon_idx + 1 : semi_idx]
+                cmd = rest[semi_idx + 1 :]
+                # Handle backslash-continued multi-line commands
+                while cmd.endswith("\\") and i + 1 < len(lines):
+                    i += 1
+                    cmd += "\n" + lines[i]
+                if cmd not in extended or extended[cmd][0] < ts:
+                    extended[cmd] = (ts, elapsed)
+            except (ValueError, IndexError):
+                if line:
+                    plain.append(line)
+        elif line:
+            plain.append(line)
+        i += 1
+
+    result = []
+    for cmd, (ts, elapsed) in sorted(extended.items(), key=lambda x: x[1][0]):
+        result.append(f": {ts}:{elapsed};{cmd}")
+
+    seen = set()
+    for line in reversed(plain):
+        if line not in seen:
+            seen.add(line)
+            result.append(line)
+
+    return result
+
+
+def _sync_history(targets):
+    local_path = os.path.expanduser("~/.zsh_history")
+    all_lines = []
+    if os.path.exists(local_path):
+        with open(local_path, "rb") as f:
+            all_lines = f.read().decode("utf-8", errors="replace").splitlines()
+
+    for name, info in targets.items():
+        host = info["host"]
+        result = subprocess.run(["ssh", host, "cat ~/.zsh_history"], capture_output=True)
+        if result.returncode == 0:
+            all_lines.extend(result.stdout.decode("utf-8", errors="replace").splitlines())
+
+    merged = _merge_zsh_history(all_lines)
+    merged_bytes = ("\n".join(merged) + "\n").encode("utf-8")
+
+    with open(local_path, "wb") as f:
+        f.write(merged_bytes)
+
+    for name, info in targets.items():
+        host = info["host"]
+        result = subprocess.run(
+            ["ssh", host, "cat > ~/.zsh_history"],
+            input=merged_bytes,
+            capture_output=True,
+        )
+        if result.returncode != 0:
+            print(f"{RED}history push error{RESET} {name}")
+
+    print(f"history: synced {len(merged)} commands")
+
+
 def cmd_sync(args):
     config = load_config()
     targets = resolve_targets(config, args.names)
@@ -81,6 +155,9 @@ def cmd_sync(args):
         else:
             print(f"{RED}error{RESET} {name} (exit {rc})")
             failed.append(name)
+
+    if not args.no_history:
+        _sync_history(targets)
 
     return 1 if failed else 0
 
@@ -128,6 +205,7 @@ def main():
     sp.add_argument("names", nargs="*", help="Remotes to sync (all if omitted)")
     sp.add_argument("--configure", action="store_true", help="Also run sync.py sync")
     sp.add_argument("--all", action="store_true", help="Also run sync.py all")
+    sp.add_argument("--no-history", action="store_true", help="Skip zsh history sync")
 
     sub.add_parser("list", help="List configured remotes")
 

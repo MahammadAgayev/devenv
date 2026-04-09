@@ -135,7 +135,25 @@ tssh() {
       tmux attach-session -t "$name"
     fi
   else
-    ssh "$@"
+    local devenv_cfg="$HOME/.devenv.json"
+    if [[ ! -f "$devenv_cfg" ]]; then
+      echo "tssh: ~/.devenv.json not found" >&2; return 1
+    fi
+    local selected
+    selected=$(jq -r '.remotes | to_entries[] | "\(.key)\t\(.value.host)"' "$devenv_cfg" \
+      | column -t \
+      | fzf --prompt="ssh> " --height=40% --reverse)
+    [[ -z "$selected" ]] && return 0
+    local host
+    host=$(echo "$selected" | awk '{print $NF}')
+    name="${host##*@}"
+    name="${name//[.:]/-}"
+    tmux new-session -d -s "$name" "ssh $host" 2>/dev/null
+    if [[ -n "$TMUX" ]]; then
+      tmux switch-client -t "$name"
+    else
+      tmux attach-session -t "$name"
+    fi
   fi
 }
 #Default unix editor
