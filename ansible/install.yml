@@ -39,3 +39,8 @@
         repo: https://github.com/zsh-users/zsh-autosuggestions.git
         dest: "{{ home }}/.oh-my-zsh/plugins/zsh-autosuggestions"
         update: false
+
+    - name: Install RTK (token compressor)
+      shell: curl -fsSL https://raw.githubusercontent.com/rtk-ai/rtk/refs/heads/master/install.sh | sh
+      args:
+        creates: "{{ home }}/.local/bin/rtk"

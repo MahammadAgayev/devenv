@@ -38,6 +38,7 @@
       "Bash(uniq *)",
       "Bash(wc *)",
       "Bash(which *)",
+      "Bash(rtk *)",
       "WebFetch",
       "mcp__monorepo-experts-mcp-server__generate_standard_go_mocks",
       "mcp__monorepo-experts-mcp-server__generate_glue_go_mocks",
@@ -69,5 +70,18 @@
     }
   },
   "effortLevel": "low",
-  "fastMode": false
+  "fastMode": false,
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/rtk-rewrite.sh"
+          }
+        ]
+      }
+    ]
+  }
 }

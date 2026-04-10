@@ -66,6 +66,20 @@
         state: link
         force: true
 
+    - name: Ensure ~/.claude/hooks exists
+      file:
+        path: "{{ home }}/.claude/hooks"
+        state: directory
+        mode: '0755'
+
+    - name: Symlink RTK hook
+      file:
+        src: "{{ devenv }}/claude/hooks/rtk-rewrite.sh"
+        dest: "{{ home }}/.claude/hooks/rtk-rewrite.sh"
+        state: link
+        force: true
+        mode: '0755'
+
     - name: Symlink go-code envrc (uber + go-devpod only)
       file:
         src: "{{ devenv }}/dotfiles/.gomonorepo.envrc.local"
