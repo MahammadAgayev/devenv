@@ -156,7 +156,7 @@ def cmd_sync(args):
             print(f"{RED}error{RESET} {name} (exit {rc})")
             failed.append(name)
 
-    if not args.no_history:
+    if args.history:
         _sync_history(targets)
 
     return 1 if failed else 0
@@ -205,7 +205,7 @@ def main():
     sp.add_argument("names", nargs="*", help="Remotes to sync (all if omitted)")
     sp.add_argument("--configure", action="store_true", help="Also run sync.py sync")
     sp.add_argument("--all", action="store_true", help="Also run sync.py all")
-    sp.add_argument("--no-history", action="store_true", help="Skip zsh history sync")
+    sp.add_argument("--history", action="store_true", help="Also sync zsh history")
 
     sub.add_parser("list", help="List configured remotes")
 
