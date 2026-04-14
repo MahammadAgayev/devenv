@@ -58,6 +58,7 @@
   "enabledPlugins": {
     "gopls-lsp@claude-plugins-official": true,
     "lua-lsp@claude-plugins-official": true,
+    "superpowers@claude-plugins-official": true,
     "uber-dev@agent-marketplace": true,
     "uber-reviewer@agent-marketplace": true
   },
