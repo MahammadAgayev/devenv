@@ -20,9 +20,13 @@
       when: ansible_facts['os_family'] in ['Debian', 'RedHat']
 
     - name: Install tree-sitter-cli (Linux)
-      community.general.npm:
-        name: tree-sitter-cli
-        global: true
+      shell: |
+        curl -fsSL "https://github.com/tree-sitter/tree-sitter/releases/latest/download/tree-sitter-linux-x64.gz" \
+          | gunzip > /usr/local/bin/tree-sitter
+        chmod +x /usr/local/bin/tree-sitter
+      args:
+        creates: /usr/local/bin/tree-sitter
+      become: true
       when: ansible_facts['system'] == 'Linux'
 
     - name: Check Oh My Zsh installed
