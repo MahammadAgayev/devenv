@@ -7,7 +7,7 @@
   tasks:
     - name: Install packages (macOS)
       community.general.homebrew:
-        name: [zsh, git, tmux, fzf, curl, neovim, ripgrep]
+        name: [zsh, git, tmux, fzf, curl, neovim, ripgrep, tree-sitter]
         state: present
       when: ansible_facts['system'] == 'Darwin'
 
@@ -18,6 +18,12 @@
         update_cache: true
       become: true
       when: ansible_facts['os_family'] in ['Debian', 'RedHat']
+
+    - name: Install tree-sitter-cli (Linux)
+      community.general.npm:
+        name: tree-sitter-cli
+        global: true
+      when: ansible_facts['system'] == 'Linux'
 
     - name: Check Oh My Zsh installed
       stat: { path: "{{ home }}/.oh-my-zsh" }
@@ -44,3 +50,9 @@
       shell: curl -fsSL https://raw.githubusercontent.com/rtk-ai/rtk/refs/heads/master/install.sh | sh
       args:
         creates: "{{ home }}/.local/bin/rtk"
+
+    - name: Update nvim-treesitter plugin
+      shell: nvim --headless -c "Lazy! update nvim-treesitter" -c "qa" 2>/dev/null || true
+
+    - name: Reinstall all treesitter parsers
+      shell: nvim --headless -c "TSUninstall! all" -c "TSInstall! all" -c "qa" 2>/dev/null || true
