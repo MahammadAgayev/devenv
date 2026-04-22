@@ -117,43 +117,76 @@ alias vim="nvim"
 
 # SSH into a host and open a named tmux window for it
 tssh() {
-  local name skip_next=0
-  for arg in "$@"; do
-    if (( skip_next )); then skip_next=0; continue; fi
-    [[ "$arg" == -[bcDEeFIiJLlmopQRSwW] ]] && { skip_next=1; continue; }
-    [[ "$arg" == -* ]] && continue
-    name="${arg##*@}"
-    name="${name//[.:]/-}"
-    break
-  done
+  if [[ $# -gt 0 ]]; then
+    local name skip_next=0
+    for arg in "$@"; do
+      if (( skip_next )); then skip_next=0; continue; fi
+      [[ "$arg" == -[bcDEeFIiJLlmopQRSwW] ]] && { skip_next=1; continue; }
+      [[ "$arg" == -* ]] && continue
+      name="${arg##*@}"
+      name="${name//[.:]/-}"
+      break
+    done
+    if [[ -n "$name" ]]; then
+      tmux new-session -d -s "$name" "ssh $*" 2>/dev/null
+      if [[ -n "$TMUX" ]]; then
+        tmux switch-client -t "$name"
+      else
+        tmux attach-session -t "$name"
+      fi
+    fi
+    return
+  fi
 
-  if [[ -n "$name" ]]; then
-    tmux new-session -d -s "$name" "ssh $*" 2>/dev/null
-    if [[ -n "$TMUX" ]]; then
-      tmux switch-client -t "$name"
-    else
-      tmux attach-session -t "$name"
-    fi
+  local devenv_cfg="$HOME/.devenv.json"
+  if [[ ! -f "$devenv_cfg" ]]; then
+    echo "tssh: ~/.devenv.json not found" >&2; return 1
+  fi
+
+  local tmpdir
+  tmpdir=$(mktemp -d)
+  setopt local_options no_monitor
+  jq -r '.remotes | to_entries[] | "\(.key)\t\(.value.host)"' "$devenv_cfg" \
+  | while IFS=$'\t' read -r rname rhost; do
+      (
+        local sessions
+        sessions=$(ssh -o BatchMode=yes -o ConnectTimeout=2 "$rhost" \
+                     'tmux ls -F "#S" 2>/dev/null' 2>/dev/null)
+        {
+          printf 'connect\t%s\t\t%s\n' "$rhost" "$rname"
+          if [[ -n "$sessions" ]]; then
+            while IFS= read -r s; do
+              printf 'session\t%s\t%s\t   %s\n' "$rhost" "$s" "$s"
+            done <<< "$sessions"
+          fi
+        } > "$tmpdir/$rname"
+      ) &
+    done
+  wait
+
+  local picked
+  picked=$(cat "$tmpdir"/* 2>/dev/null \
+    | fzf --delimiter=$'\t' --with-nth=4 --prompt="tssh> " --height=40% --reverse)
+  rm -rf "$tmpdir"
+  [[ -z "$picked" ]] && return 0
+
+  local action host session
+  action=$(printf '%s' "$picked" | cut -f1)
+  host=$(printf   '%s' "$picked" | cut -f2)
+  session=$(printf '%s' "$picked" | cut -f3)
+
+  local name="${host##*@}"
+  name="${name//[.:]/-}"
+
+  local cmd="ssh $host"
+  [[ "$action" == "session" ]] && cmd="ssh -t $host tmux attach -t $session"
+
+  tmux new-session -d -s "$name" "$cmd" 2>/dev/null
+
+  if [[ -n "$TMUX" ]]; then
+    tmux switch-client -t "$name"
   else
-    local devenv_cfg="$HOME/.devenv.json"
-    if [[ ! -f "$devenv_cfg" ]]; then
-      echo "tssh: ~/.devenv.json not found" >&2; return 1
-    fi
-    local selected
-    selected=$(jq -r '.remotes | to_entries[] | "\(.key)\t\(.value.host)"' "$devenv_cfg" \
-      | column -t \
-      | fzf --prompt="ssh> " --height=40% --reverse)
-    [[ -z "$selected" ]] && return 0
-    local host
-    host=$(echo "$selected" | awk '{print $NF}')
-    name="${host##*@}"
-    name="${name//[.:]/-}"
-    tmux new-session -d -s "$name" "ssh $host" 2>/dev/null
-    if [[ -n "$TMUX" ]]; then
-      tmux switch-client -t "$name"
-    else
-      tmux attach-session -t "$name"
-    fi
+    tmux attach-session -t "$name"
   fi
 }
 #Default unix editor

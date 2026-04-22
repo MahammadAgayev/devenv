@@ -23,6 +23,24 @@
         - src: ".gitconfig"
           dest: ".gitconfig"
 
+    - name: Ensure ~/.ssh exists
+      file:
+        path: "{{ home }}/.ssh"
+        state: directory
+        mode: '0700'
+
+    - name: Set perms on dotfiles/.ssh-config (ssh requires 0600)
+      file:
+        path: "{{ devenv }}/dotfiles/.ssh-config"
+        mode: '0600'
+
+    - name: Symlink ~/.ssh/config
+      file:
+        src: "{{ devenv }}/dotfiles/.ssh-config"
+        dest: "{{ home }}/.ssh/config"
+        state: link
+        force: true
+
     - name: Symlink .gitconfig_uber (uber only)
       file:
         src: "{{ devenv }}/dotfiles/.gitconfig_uber"
