@@ -57,6 +57,14 @@
         force: true
         mode: '0755'
 
+    - name: Symlink tmux-ssh
+      file:
+        src: "{{ devenv }}/scripts/tmux-ssh"
+        dest: "{{ home }}/tmux-ssh"
+        state: link
+        force: true
+        mode: '0755'
+
     - name: Symlink nvim config
       file:
         src: "{{ devenv }}/nvim"

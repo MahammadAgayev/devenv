@@ -1,0 +1,72 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+switch_to() {
+    if [[ -z ${TMUX:-} ]]; then
+        tmux attach-session -t "$1"
+    else
+        tmux switch-client -t "$1"
+    fi
+}
+
+# Direct ssh: tssh user@host or tssh -p 22 host
+if [[ $# -gt 0 ]]; then
+    name=""
+    skip_next=0
+    for arg in "$@"; do
+        if (( skip_next )); then skip_next=0; continue; fi
+        [[ "$arg" == -[bcDEeFIiJLlmopQRSwW] ]] && { skip_next=1; continue; }
+        [[ "$arg" == -* ]] && continue
+        name="${arg##*@}"
+        name="${name//[.:]/-}"
+        break
+    done
+    if [[ -n "$name" ]]; then
+        tmux new-session -d -s "$name" "ssh $*" 2>/dev/null || true
+        switch_to "$name"
+    fi
+    exit 0
+fi
+
+# Interactive picker: read remotes from ~/.devenv.json
+devenv_cfg="$HOME/.devenv.json"
+if [[ ! -f "$devenv_cfg" ]]; then
+    echo "tmux-ssh: ~/.devenv.json not found" >&2
+    exit 1
+fi
+
+tmpdir=$(mktemp -d)
+trap 'rm -rf "$tmpdir"' EXIT
+
+while IFS=$'\t' read -r rname rhost; do
+    (
+        sessions=$(ssh -o BatchMode=yes -o ConnectTimeout=2 "$rhost" \
+                     'tmux ls -F "#S" 2>/dev/null' 2>/dev/null || true)
+        {
+            printf 'connect\t%s\t\t%s\n' "$rhost" "$rname"
+            if [[ -n "$sessions" ]]; then
+                while IFS= read -r s; do
+                    printf 'session\t%s\t%s\t   %s\n' "$rhost" "$s" "$s"
+                done <<< "$sessions"
+            fi
+        } > "$tmpdir/$rname"
+    ) &
+done < <(jq -r '.remotes | to_entries[] | "\(.key)\t\(.value.host)"' "$devenv_cfg")
+wait
+
+picked=$(cat "$tmpdir"/* 2>/dev/null \
+    | fzf --delimiter=$'\t' --with-nth=4 --prompt="ssh> " --height=40% --reverse)
+[[ -z "$picked" ]] && exit 0
+
+action=$(printf '%s' "$picked" | cut -f1)
+host=$(printf   '%s' "$picked" | cut -f2)
+session=$(printf '%s' "$picked" | cut -f3)
+
+name="${host##*@}"
+name="${name//[.:]/-}"
+
+cmd="ssh $host"
+[[ "$action" == "session" ]] && cmd="ssh -t $host tmux attach -t $session"
+
+tmux new-session -d -s "$name" "$cmd" 2>/dev/null || true
+switch_to "$name"
