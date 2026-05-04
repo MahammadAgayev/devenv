@@ -68,7 +68,6 @@ local function open_terminal(cwd)
         if vim.bo[buf].buftype == "terminal" and vim.b[buf].term_cwd == cwd then
             vim.cmd("belowright split")
             vim.api.nvim_set_current_buf(buf)
-            vim.cmd("startinsert")
             return
         end
     end
@@ -76,7 +75,6 @@ local function open_terminal(cwd)
     if cwd ~= vim.loop.cwd() then vim.cmd("lcd " .. cwd) end
     vim.cmd("term")
     vim.b.term_cwd = cwd
-    vim.cmd("startinsert")
 end
 
 vim.keymap.set("n", "<leader>tr", function() open_terminal() end)
@@ -84,7 +82,6 @@ vim.keymap.set("n", "<leader>tc", function() open_terminal(vim.fn.expand("%:p:h"
 vim.keymap.set("n", "<leader>tn", function()
     vim.cmd("belowright split | term")
     vim.b.term_cwd = vim.loop.cwd()
-    vim.cmd("startinsert")
 end)
 
 -- exit terminal mode (only via jk, not Esc)

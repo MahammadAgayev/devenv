@@ -12,7 +12,7 @@ return {
             window = {
                 split_ratio = 1.0,
                 position = "tab split",
-                enter_insert = true,
+                enter_insert = false,
                 hide_numbers = true,
                 hide_signcolumn = true,
                 float = {
@@ -43,5 +43,22 @@ return {
         vim.keymap.set("t", "<leader>cc", "<C-\\><C-n>:ClaudeCode<CR>", { desc = "Toggle Claude Code (float)" })
         vim.keymap.set("n", "<leader>cC", ":ClaudeCodeContinue<CR>", { desc = "Continue Claude Code conversation" })
         vim.keymap.set("n", "<leader>cV", ":ClaudeCodeResume<CR>", { desc = "Resume Claude Code conversation" })
+
+        vim.keymap.set("n", "<leader>cm", function()
+            local cc = require("claude-code")
+            local bufnr = cc.claude_code.instances[cc.claude_code.current_instance]
+            if not bufnr or not vim.api.nvim_buf_is_valid(bufnr) then
+                vim.notify("Claude Code is not running", vim.log.levels.WARN)
+                return
+            end
+            Snacks.picker.buffers({
+                confirm = function(picker, item)
+                    picker:close()
+                    local path = vim.fn.fnamemodify(item.file, ":p")
+                    local job_id = vim.b[bufnr].terminal_job_id
+                    vim.fn.chansend(job_id, "@" .. path .. " ")
+                end,
+            })
+        end, { desc = "Mention buffer in Claude Code" })
     end
 }
