@@ -81,6 +81,11 @@ end
 
 vim.keymap.set("n", "<leader>tr", function() open_terminal() end)
 vim.keymap.set("n", "<leader>tc", function() open_terminal(vim.fn.expand("%:p:h")) end)
+vim.keymap.set("n", "<leader>tn", function()
+    vim.cmd("belowright split | term")
+    vim.b.term_cwd = vim.loop.cwd()
+    vim.cmd("startinsert")
+end)
 
 -- exit terminal mode (only via jk, not Esc)
 vim.keymap.set("t", "jk", "<C-\\><C-n>")
