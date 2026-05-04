@@ -61,9 +61,26 @@ vim.keymap.set("n", "<leader><leader>", function()
     vim.cmd("so")
 end)
 
--- open terminal (bottom)
-vim.keymap.set("n", "<leader>tr", "<cmd>belowright split | term<CR>")
-vim.keymap.set("n", "<leader>tc", "<cmd>belowright split | lcd %:p:h | term<CR>")
+-- open terminal (bottom), reuse existing terminal buffer for the given cwd
+local function open_terminal(cwd)
+    cwd = cwd or vim.loop.cwd()
+    for _, buf in ipairs(vim.api.nvim_list_bufs()) do
+        if vim.bo[buf].buftype == "terminal" and vim.b[buf].term_cwd == cwd then
+            vim.cmd("belowright split")
+            vim.api.nvim_set_current_buf(buf)
+            vim.cmd("startinsert")
+            return
+        end
+    end
+    vim.cmd("belowright split")
+    if cwd ~= vim.loop.cwd() then vim.cmd("lcd " .. cwd) end
+    vim.cmd("term")
+    vim.b.term_cwd = cwd
+    vim.cmd("startinsert")
+end
+
+vim.keymap.set("n", "<leader>tr", function() open_terminal() end)
+vim.keymap.set("n", "<leader>tc", function() open_terminal(vim.fn.expand("%:p:h")) end)
 
 -- exit terminal mode (only via jk, not Esc)
 vim.keymap.set("t", "jk", "<C-\\><C-n>")
