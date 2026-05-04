@@ -10,18 +10,18 @@ return {
 
             -- Window configuration
             window = {
-                split_ratio = 0.38, -- dont' judge me:)
-                position = "rightbelow vsplit",
+                split_ratio = 1.0,
+                position = "tab split",
                 enter_insert = true,
                 hide_numbers = true,
                 hide_signcolumn = true,
                 float = {
-                    width = "80%",
-                    height = "80%",
-                    row = "center",
-                    col = "center",
+                    width = "100%",
+                    height = "100%",
+                    row = 0,
+                    col = 0,
                     relative = "editor",
-                    border = "rounded",
+                    border = "none",
                 },
             },
 
@@ -39,8 +39,8 @@ return {
         })
 
         -- Key mappings
-        vim.keymap.set("n", "<leader>cc", ":ClaudeCode<CR>", { desc = "Toggle Claude Code terminal" })
-        vim.keymap.set("t", "<leader>cc", "<C-\\><C-n>:ClaudeCode<CR>", { desc = "Toggle Claude Code terminal" })
+        vim.keymap.set("n", "<leader>cc", ":ClaudeCode<CR>", { desc = "Toggle Claude Code (float)" })
+        vim.keymap.set("t", "<leader>cc", "<C-\\><C-n>:ClaudeCode<CR>", { desc = "Toggle Claude Code (float)" })
         vim.keymap.set("n", "<leader>cC", ":ClaudeCodeContinue<CR>", { desc = "Continue Claude Code conversation" })
         vim.keymap.set("n", "<leader>cV", ":ClaudeCodeResume<CR>", { desc = "Resume Claude Code conversation" })
     end
