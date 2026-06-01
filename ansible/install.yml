@@ -7,27 +7,27 @@
   tasks:
     - name: Install packages (macOS)
       community.general.homebrew:
-        name: [zsh, git, tmux, fzf, curl, neovim, ripgrep, tree-sitter]
+        name: [zsh, git, tmux, fzf, curl, neovim, ripgrep]
         state: present
       when: ansible_facts['system'] == 'Darwin'
 
     - name: Install packages (Linux)
       apt:
-        name: [zsh, git, tmux, fzf, curl, ripgrep]
+        name: [zsh, git, tmux, fzf, curl, ripgrep, build-essential]
         state: present
         update_cache: true
       become: true
       when: ansible_facts['os_family'] in ['Debian', 'RedHat']
 
-    - name: Install tree-sitter-cli (Linux)
-      shell: |
-        curl -fsSL "https://github.com/tree-sitter/tree-sitter/releases/latest/download/tree-sitter-linux-x64.gz" \
-          | gunzip > /usr/local/bin/tree-sitter
-        chmod +x /usr/local/bin/tree-sitter
+    - name: Install Rust via rustup
+      shell: curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --no-modify-path
       args:
-        creates: /usr/local/bin/tree-sitter
-      become: true
-      when: ansible_facts['system'] == 'Linux'
+        creates: "{{ home }}/.cargo/bin/cargo"
+
+    - name: Install tree-sitter-cli via cargo
+      shell: "{{ home }}/.cargo/bin/cargo install --locked tree-sitter-cli"
+      args:
+        creates: "{{ home }}/.cargo/bin/tree-sitter"
 
     - name: Check Oh My Zsh installed
       stat: { path: "{{ home }}/.oh-my-zsh" }
