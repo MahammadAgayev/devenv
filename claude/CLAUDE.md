@@ -1,120 +1,69 @@
 # Mahammad's workflow/guidelines
+Behavioral guidelines to reduce common LLM coding mistakes. Merge with project-specific instructions as needed.
 
-### 1. Plan Node Default
-- Enter plan mode for ANY non-trivial task (3+ steps or architectural decisions)
-- If something goes sideways, STOP and re-plan immediately – don't keep pushing
-- Use plan mode for verification steps, not just building
-- Write detailed specs upfront to reduce ambiguity
+**Tradeoff:** These guidelines bias toward caution over speed. For trivial tasks, use judgment.
 
-### 2. Subagent Strategy
-- Use subagents liberally to keep main context window clean
-- Offload research, exploration, and parallel analysis to subagents
-- For complex problems, throw more compute at it via subagents
-- One task per subagent for focused execution
+## 1. Think Before Coding
 
-### 3. Self-Improvement Loop
-- After ANY correction from the user: update `tasks/lessons.md` with the pattern
-- Write rules for yourself that prevent the same mistake
-- Ruthlessly iterate on these lessons until mistake rate drops
-- Review lessons at session start for relevant project
+**Don't assume. Don't hide confusion. Surface tradeoffs.**
 
-### 4. Verification Before Done
-- Never mark a task complete without proving it works
-- Diff behavior between main and your changes when relevant
-- Ask yourself: "Would a staff engineer approve this?"
-- Run tests, check logs, demonstrate correctness
+Before implementing:
+- State your assumptions explicitly. If uncertain, ask.
+- If multiple interpretations exist, present them - don't pick silently.
+- If a simpler approach exists, say so. Push back when warranted.
+- If something is unclear, stop. Name what's confusing. Ask.
 
-### 5. Demand Elegance (Balanced)
-- For non-trivial changes: pause and ask "is there a more elegant way?"
-- If a fix feels hacky: "Knowing everything I know now, implement the elegant solution"
-- Skip this for simple, obvious fixes – don't over-engineer
-- Challenge your own work before presenting it
+## 2. Simplicity First
 
-### 6. Autonomous Bug Fixing
-- When given a bug report: just fix it. Don't ask for hand-holding
-- Point at logs, errors, failing tests – then resolve them
-- Zero context switching required from the user
-- Go fix failing CI tests without being told how
+**Minimum code that solves the problem. Nothing speculative.**
 
-## Task Management
+- No features beyond what was asked.
+- No abstractions for single-use code.
+- No "flexibility" or "configurability" that wasn't requested.
+- No error handling for impossible scenarios.
+- If you write 200 lines and it could be 50, rewrite it.
 
-1. **Plan First**: Write plan to `tasks/todo.md` with checkable items
-2. **Verify Plan**: Check in before starting implementation
-3. **Track Progress**: Mark items complete as you go
-4. **Explain Changes**: High-level summary at each step
-5. **Document Results**: Add review section to `tasks/todo.md`
-6. **Capture Lessons**: Update `tasks/lessons.md` after corrections
+Ask yourself: "Would a senior engineer say this is overcomplicated?" If yes, simplify.
 
-## Core Principles
+## 3. Surgical Changes
 
-- **Simplicity First**: Make every change as simple as possible. Impact minimal code.
-- **No Laziness**: Find root causes. No temporary fixes. Senior developer standards.
-- **Limit changes**: If we are doing change to any existing we should plan in a way that, each PR is limited to 70 lines as much as possible
-- The favorite engineer - John Carmack
-- Love the simple abstraction of "everything is file in linux", "everything is buffer in neovim"
+**Touch only what you must. Clean up only your own mess.**
 
-## arh CLI — Stacked Diffs Workflow (GitHub)
+When editing existing code:
+- Don't "improve" adjacent code, comments, or formatting.
+- Don't refactor things that aren't broken.
+- Match existing style, even if you'd do it differently.
+- If you notice unrelated dead code, mention it - don't delete it.
 
-`arh` (Arrowhead) is Uber's GitHub-based stacked diffs CLI. It manages feature branch **trees** where each branch is parented on another, enabling dependent PRs to be published, rebased, and merged in order.
+When your changes create orphans:
+- Remove imports/variables/functions that YOUR changes made unused.
+- Don't remove pre-existing dead code unless asked.
 
-### Mental Model
+The test: Every changed line should trace directly to the user's request.
 
+## 4. Goal-Driven Execution
+
+**Define success criteria. Loop until verified.**
+
+Transform tasks into verifiable goals:
+- "Add validation" → "Write tests for invalid inputs, then make them pass"
+- "Fix the bug" → "Write a test that reproduces it, then make it pass"
+- "Refactor X" → "Ensure tests pass before and after"
+
+For multi-step tasks, state a brief plan:
 ```
-main → feature-A → feature-B → feature-C
+1. [Step] → verify: [check]
+2. [Step] → verify: [check]
+3. [Step] → verify: [check]
 ```
 
-Each node is a branch. Each branch gets its own PR targeting its parent. Merging flows from root to leaf.
+Strong success criteria let you loop independently. Weak criteria ("make it work") require constant clarification.
 
-### Core Commands
+---
 
-| Command | What it does |
-|---|---|
-| `arh feature <name>` | Create new branch off current (alias: `ft`) |
-| `arh publish` | Create/update PRs from root to current branch |
-| `arh publish --full-stack` | Publish entire tree root→leaf |
-| `arh rebase --sync` | Pull main + smart-rebase entire stack |
-| `arh log -t .` | Show full stack tree from current branch |
-| `arh checkout next/prev` | Navigate up/down the stack |
-| `arh tidy` | Remove branches whose PRs are already merged |
-| `arh discard -f <branch>` | Delete one branch, re-parent its children |
-| `arh pubslih --no-interactive --change-planned` | publish PR to showcase the code|
+**These guidelines are working if:** fewer unnecessary changes in diffs, fewer rewrites due to overcomplication, and clarifying questions come before implementation rather than after mistakes.
 
-### Commit Message Format (auto-populates PR)
-
-```
-<PR Title>
-
-Summary:
-<Description>
-
-Test Plan:
-<How tested>
-
-Jira Issues: PROJECT-1234
-```
-
-### Stacked Diff Ideas & Patterns
-
-**Slice by concern, not by size** — each stack layer should be a coherent unit:
-- Layer 1: schema/migration changes
-- Layer 2: data layer / repository
-- Layer 3: service/business logic
-- Layer 4: API/handler
-- Layer 5: tests
-
-**Keep layers ≤70 lines** (matches PR size principle) — forces clean slicing.
-
-**Sync before you publish** — always `arh rebase --sync` before `arh publish` to avoid stale base conflicts.
-
-**Use `arh log -t . -s`** to see PR status across the whole stack at a glance (add `-c` for commit counts).
-
-**Tidy frequently** — run `arh tidy` after merges to keep the tree clean; avoids rebasing already-merged branches.
-
-**Auto-merge the leaf** — use `arh publish --auto-merge` on the final layer once all ancestors are approved; they merge in order automatically.
-
-**Restack for mid-stack insertions** — if you need to inject a new layer between A and B: create new branch off A, then `arh restack -p <new-branch> -f B` to re-parent B.
-
-## Tool Hints
+# Tool Hints
 - Permissions are matched by command prefix (e.g. `Bash(find *)`). Chaining commands with `&&`, `||`, `;`, or `|` breaks prefix matching and triggers unnecessary permission prompts.
 - Always use single commands with absolute paths so they match the allowed permission patterns.
 - Instead of `cd /path && git log`, use `git -C /path log`.
