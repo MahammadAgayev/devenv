@@ -1,0 +1,19 @@
+{
+  "providers": {
+    "uber": {
+      "baseUrl": "https://genai-api.uberinternal.com/v1",
+      "api": "openai-completions",
+      "apiKey": "!usso -ussh genai-api.uberinternal.com -print",
+      "models": [
+        {
+          "id": "claude-opus-4-6-thinking",
+          "contextWindow": 200000,
+          "maxTokens": 32000,
+          "compat": {
+            "supportsDeveloperRole": false
+          }
+        }
+      ]
+    }
+  }
+}
