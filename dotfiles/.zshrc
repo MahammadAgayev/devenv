@@ -118,6 +118,7 @@ bindkey -s ^g "$HOME/tmux-ssh\n"
 alias vim="nvim"
 
 alias tssh="$HOME/tmux-ssh"
+alias tpi="$HOME/tpi"
 #Default unix editor
 export VISUAL=nvim
 export EDITOR="$VISUAL"

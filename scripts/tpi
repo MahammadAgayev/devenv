@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# tpi - run pi in a tmux window so you can detach and come back
+set -euo pipefail
+
+# Must be inside tmux
+if [[ -z "${TMUX:-}" ]]; then
+    echo "tpi: not inside tmux, just run pi directly" >&2
+    exit 1
+fi
+
+session=$(tmux display-message -p '#S')
+window_name="${session}.pi"
+
+# If the pi window already exists, just switch to it
+if tmux list-windows -t "$session" -F '#W' | grep -qx "$window_name"; then
+    tmux select-window -t "${session}:${window_name}"
+    exit 0
+fi
+
+# Create a new window running pi, pass through all args
+tmux new-window -n "$window_name" "pi $*"

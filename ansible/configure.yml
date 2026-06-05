@@ -65,6 +65,14 @@
         force: true
         mode: '0755'
 
+    - name: Symlink tpi
+      file:
+        src: "{{ devenv }}/scripts/tpi"
+        dest: "{{ home }}/tpi"
+        state: link
+        force: true
+        mode: '0755'
+
     - name: Symlink nvim config
       file:
         src: "{{ devenv }}/nvim"
@@ -129,6 +137,36 @@
         force: true
         mode: '0755'
       when: profile == 'uber' and workspace == 'go-devpod'
+
+    - name: Ensure ~/.pi/agent exists
+      file:
+        path: "{{ home }}/.pi/agent"
+        state: directory
+        mode: '0755'
+
+    - name: Symlink Pi models config (uber only)
+      file:
+        src: "{{ devenv }}/pi/models.uber.json"
+        dest: "{{ home }}/.pi/agent/models.json"
+        state: link
+        force: true
+      when: profile == 'uber'
+
+    - name: Symlink Pi settings config (uber only)
+      file:
+        src: "{{ devenv }}/pi/settings.uber.json"
+        dest: "{{ home }}/.pi/agent/settings.json"
+        state: link
+        force: true
+      when: profile == 'uber'
+
+    - name: Symlink Pi settings config (personal)
+      file:
+        src: "{{ devenv }}/pi/settings.json"
+        dest: "{{ home }}/.pi/agent/settings.json"
+        state: link
+        force: true
+      when: profile != 'uber'
 
     - name: Install devenv post-merge hook
       file:
