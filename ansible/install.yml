@@ -7,13 +7,13 @@
   tasks:
     - name: Install packages (macOS)
       community.general.homebrew:
-        name: [zsh, git, tmux, fzf, curl, neovim, ripgrep]
+        name: [zsh, git, tmux, fzf, curl, neovim, ripgrep, node]
         state: present
       when: ansible_facts['system'] == 'Darwin'
 
     - name: Install packages (Linux)
       apt:
-        name: [zsh, git, tmux, fzf, curl, ripgrep, build-essential]
+        name: [zsh, git, tmux, fzf, curl, ripgrep, build-essential, nodejs, npm]
         state: present
         update_cache: true
       become: true
