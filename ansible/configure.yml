@@ -160,13 +160,21 @@
         force: true
       when: profile == 'uber'
 
+    - name: Symlink Pi models config (personal)
+      file:
+        src: "{{ devenv }}/pi/models.json"
+        dest: "{{ home }}/.pi/agent/models.json"
+        state: link
+        force: true
+      when: profile == 'personal'
+
     - name: Symlink Pi settings config (personal)
       file:
         src: "{{ devenv }}/pi/settings.json"
         dest: "{{ home }}/.pi/agent/settings.json"
         state: link
         force: true
-      when: profile != 'uber'
+      when: profile == 'personal'
 
     - name: Install devenv post-merge hook
       file:
