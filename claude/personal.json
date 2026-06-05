@@ -1,13 +1,7 @@
 {
-  "enabledPlugins": {
-    "gopls-lsp@claude-plugins-official": true,
-    "lua-lsp@claude-plugins-official": true
-  },
   "env": {
     "ENABLE_TOOL_SEARCH": "false"
   },
-  "fastMode": false,
-  "model": "opus",
   "permissions": {
     "allow": [
       "Bash(basename *)",
@@ -62,5 +56,10 @@
         ]
       }
     ]
-  }
+  },
+  "enabledPlugins": {
+    "gopls-lsp@claude-plugins-official": true,
+    "lua-lsp@claude-plugins-official": true
+  },
+  "fastMode": false
 }
