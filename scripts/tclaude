@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+# tclaude - run claude in a tmux window so you can detach and come back
+set -euo pipefail
+
+# Must be inside tmux
+if [[ -z "${TMUX:-}" ]]; then
+    echo "tclaude: not inside tmux, just run claude directly" >&2
+    exit 1
+fi
+
+# Pick the right claude command based on profile in ~/.devenv.json
+profile=""
+if [[ -r "$HOME/.devenv.json" ]] && command -v jq >/dev/null 2>&1; then
+    profile=$(jq -r '.profile // ""' "$HOME/.devenv.json")
+fi
+
+if [[ "$profile" == "uber" ]]; then
+    set -- claude "$@"
+    cmd="aifx agent run"
+else
+    cmd="claude"
+fi
+
+session=$(tmux display-message -p '#S')
+window_name="${session}.claude"
+
+# If the claude window already exists, just switch to it
+if tmux list-windows -t "$session" -F '#W' | grep -qx "$window_name"; then
+    tmux select-window -t "${session}:${window_name}"
+    exit 0
+fi
+
+# Create a new window running claude, pass through all args (quoted safely)
+tmux new-window -n "$window_name" "$cmd $(printf '%q ' "$@")"
