@@ -1,24 +1,5 @@
 {
   "apiKeyHelper": "/Users/aghayev/.local/share/aifx/bin/claude-genai-token-helper",
-  "availableModels": [
-    "claude-sonnet-4-6[1m]",
-    "claude-opus-4-6[1m]",
-    "claude-haiku-4-5",
-    "claude-opus-4-7[1m]"
-  ],
-  "effortLevel": "low",
-  "enabledMcpjsonServers": [
-    "code-mcp"
-  ],
-  "enabledPlugins": {
-    "code-mode@agent-marketplace": true,
-    "cost-check@agent-marketplace": true,
-    "google-workspace@agent-marketplace": true,
-    "gopls-lsp@claude-plugins-official": true,
-    "lua-lsp@claude-plugins-official": true,
-    "uber-dev@agent-marketplace": true,
-    "uber-reviewer@agent-marketplace": true
-  },
   "env": {
     "ANTHROPIC_BASE_URL": "https://genai-api.uberinternal.com",
     "ANTHROPIC_CUSTOM_HEADERS": "OpenAI-Organization: 3caa75e6-e440-4b5e-afc5-4cc3231cceb4",
@@ -43,148 +24,6 @@
     "OTEL_SERVICE_NAME": "claude-code",
     "OTEL_SERVICE_VERSION": "1.0.0"
   },
-  "extraKnownMarketplaces": {
-    "uber-code/devexp-agent-marketplace": {
-      "source": {
-        "path": "/Users/aghayev/.local/share/aifx/marketplaces/uber-code/devexp-agent-marketplace",
-        "source": "directory"
-      }
-    }
-  },
-  "fastMode": false,
-  "hooks": {
-    "PermissionRequest": [
-      {
-        "hooks": [
-          {
-            "async": true,
-            "command": "aifx analytics emit --agent claude_code",
-            "timeout": 5,
-            "type": "command"
-          }
-        ]
-      }
-    ],
-    "PostToolUse": [
-      {
-        "hooks": [
-          {
-            "async": true,
-            "command": "aifx analytics emit --agent claude_code",
-            "timeout": 5,
-            "type": "command"
-          }
-        ]
-      }
-    ],
-    "PostToolUseFailure": [
-      {
-        "hooks": [
-          {
-            "async": true,
-            "command": "aifx analytics emit --agent claude_code",
-            "timeout": 5,
-            "type": "command"
-          }
-        ]
-      }
-    ],
-    "PreToolUse": [
-      {
-        "hooks": [
-          {
-            "command": "~/.claude/hooks/rtk-rewrite.sh",
-            "type": "command"
-          }
-        ],
-        "matcher": "Bash"
-      },
-      {
-        "hooks": [
-          {
-            "async": true,
-            "command": "aifx analytics emit --agent claude_code",
-            "timeout": 5,
-            "type": "command"
-          }
-        ]
-      }
-    ],
-    "SessionEnd": [
-      {
-        "hooks": [
-          {
-            "async": true,
-            "command": "aifx analytics emit --agent claude_code",
-            "timeout": 5,
-            "type": "command"
-          }
-        ]
-      }
-    ],
-    "SessionStart": [
-      {
-        "hooks": [
-          {
-            "async": true,
-            "command": "aifx analytics emit --agent claude_code",
-            "timeout": 5,
-            "type": "command"
-          }
-        ]
-      }
-    ],
-    "Stop": [
-      {
-        "hooks": [
-          {
-            "async": true,
-            "command": "aifx analytics emit --agent claude_code",
-            "timeout": 5,
-            "type": "command"
-          }
-        ]
-      }
-    ],
-    "SubagentStart": [
-      {
-        "hooks": [
-          {
-            "async": true,
-            "command": "aifx analytics emit --agent claude_code",
-            "timeout": 5,
-            "type": "command"
-          }
-        ]
-      }
-    ],
-    "SubagentStop": [
-      {
-        "hooks": [
-          {
-            "async": true,
-            "command": "aifx analytics emit --agent claude_code",
-            "timeout": 5,
-            "type": "command"
-          }
-        ]
-      }
-    ],
-    "UserPromptSubmit": [
-      {
-        "hooks": [
-          {
-            "async": true,
-            "command": "aifx analytics emit --agent claude_code",
-            "timeout": 5,
-            "type": "command"
-          }
-        ]
-      }
-    ]
-  },
-  "model": "sonnet",
-  "otelHeadersHelper": "/Users/aghayev/.local/share/aifx/bin/claude-telemetry-token-helper",
   "permissions": {
     "allow": [
       "Bash(basename *)",
@@ -228,14 +67,183 @@
       "mcp__monorepo-experts-mcp-server__update_build_files",
       "mcp__monorepo-experts-mcp-server__get_coverage_report"
     ],
-    "defaultMode": "default",
     "deny": [
       "Bash(git commit *)",
       "Bash(git push *)"
+    ],
+    "defaultMode": "default"
+  },
+  "model": "opus",
+  "availableModels": [
+    "claude-sonnet-4-6[1m]",
+    "claude-opus-4-6[1m]",
+    "claude-haiku-4-5",
+    "claude-opus-4-7[1m]"
+  ],
+  "enabledMcpjsonServers": [
+    "code-mcp"
+  ],
+  "hooks": {
+    "PermissionRequest": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "aifx analytics emit --agent claude_code",
+            "timeout": 5,
+            "async": true
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "aifx analytics emit --agent claude_code",
+            "timeout": 5,
+            "async": true
+          }
+        ]
+      }
+    ],
+    "PostToolUseFailure": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "aifx analytics emit --agent claude_code",
+            "timeout": 5,
+            "async": true
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/rtk-rewrite.sh"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "aifx analytics emit --agent claude_code",
+            "timeout": 5,
+            "async": true
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "aifx analytics emit --agent claude_code",
+            "timeout": 5,
+            "async": true
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "aifx analytics emit --agent claude_code",
+            "timeout": 5,
+            "async": true
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "aifx analytics emit --agent claude_code",
+            "timeout": 5,
+            "async": true
+          }
+        ]
+      }
+    ],
+    "SubagentStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "aifx analytics emit --agent claude_code",
+            "timeout": 5,
+            "async": true
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "aifx analytics emit --agent claude_code",
+            "timeout": 5,
+            "async": true
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "aifx analytics emit --agent claude_code",
+            "timeout": 5,
+            "async": true
+          }
+        ]
+      }
     ]
   },
   "statusLine": {
-    "command": "aifx statusline",
-    "type": "command"
-  }
+    "type": "command",
+    "command": "aifx statusline"
+  },
+  "enabledPlugins": {
+    "code-mode@agent-marketplace": true,
+    "cost-check@agent-marketplace": true,
+    "google-workspace@agent-marketplace": true,
+    "gopls-lsp@claude-plugins-official": true,
+    "jr@reichert-skills": true,
+    "lua-lsp@claude-plugins-official": true,
+    "uber-dev@agent-marketplace": true,
+    "uber-reviewer@agent-marketplace": true
+  },
+  "extraKnownMarketplaces": {
+    "reichert-skills": {
+      "source": {
+        "source": "git",
+        "url": "gitolite@code.uber.internal:not-production/personal-reichert-dotfiles"
+      }
+    },
+    "uber-code/devexp-agent-marketplace": {
+      "source": {
+        "source": "directory",
+        "path": "/Users/aghayev/.local/share/aifx/marketplaces/uber-code/devexp-agent-marketplace"
+      }
+    }
+  },
+  "otelHeadersHelper": "/Users/aghayev/.local/share/aifx/bin/claude-telemetry-token-helper",
+  "effortLevel": "medium",
+  "fastMode": false,
+  "skipDangerousModePermissionPrompt": true
 }

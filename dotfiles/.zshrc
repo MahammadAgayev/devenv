@@ -119,6 +119,7 @@ alias vim="nvim"
 
 alias tssh="$HOME/tmux-ssh"
 alias tpi="$HOME/tpi"
+alias tclaude="$HOME/tclaude"
 #Default unix editor
 export VISUAL=nvim
 export EDITOR="$VISUAL"

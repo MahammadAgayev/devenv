@@ -6,7 +6,7 @@
       "apiKey": "!usso -ussh genai-api.uberinternal.com -print",
       "models": [
         {
-          "id": "claude-opus-4-6-thinking",
+          "id": "claude-opus-4-8-thinking",
           "contextWindow": 200000,
           "maxTokens": 32000,
           "compat": {

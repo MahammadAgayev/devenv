@@ -73,6 +73,14 @@
         force: true
         mode: '0755'
 
+    - name: Symlink tclaude
+      file:
+        src: "{{ devenv }}/scripts/tclaude"
+        dest: "{{ home }}/tclaude"
+        state: link
+        force: true
+        mode: '0755'
+
     - name: Symlink nvim config
       file:
         src: "{{ devenv }}/nvim"
