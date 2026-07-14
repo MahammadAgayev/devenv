@@ -117,6 +117,41 @@ bindkey -s ^g "$HOME/tmux-ssh\n"
 
 alias vim="nvim"
 
+clip() {
+  if [[ -z "$1" ]]; then
+    echo "Usage: clip <path> or clip <host>:<path>" >&2
+    return 1
+  fi
+
+  if [[ "$1" == *:* ]]; then
+    local host="${1%%:*}"
+    local path="${1#*:}"
+    ssh "$host" "cat '$path'" | _clip_copy
+  else
+    if [[ ! -f "$1" ]]; then
+      echo "clip: $1: No such file" >&2
+      return 1
+    fi
+    _clip_copy < "$1"
+  fi
+  echo "Copied to clipboard."
+}
+
+_clip_copy() {
+  if command -v pbcopy &>/dev/null; then
+    pbcopy
+  elif command -v xclip &>/dev/null; then
+    xclip -selection clipboard
+  elif command -v xsel &>/dev/null; then
+    xsel --clipboard --input
+  elif command -v wl-copy &>/dev/null; then
+    wl-copy
+  else
+    echo "clip: no clipboard tool found (need pbcopy, xclip, xsel, or wl-copy)" >&2
+    return 1
+  fi
+}
+
 alias tssh="$HOME/tmux-ssh"
 alias tpi="$HOME/tpi"
 alias tclaude="$HOME/tclaude"
