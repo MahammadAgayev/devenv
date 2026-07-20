@@ -81,6 +81,19 @@
         force: true
         mode: '0755'
 
+    - name: Ensure ~/.config/ghostty exists
+      file:
+        path: "{{ home }}/.config/ghostty"
+        state: directory
+        mode: '0755'
+
+    - name: Symlink ghostty config
+      file:
+        src: "{{ devenv }}/dotfiles/ghostty.config"
+        dest: "{{ home }}/.config/ghostty/config"
+        state: link
+        force: true
+
     - name: Symlink nvim config
       file:
         src: "{{ devenv }}/nvim"
