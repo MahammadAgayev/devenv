@@ -1,9 +1,22 @@
+local transparent_hls = {
+	"Normal", "NormalFloat", "NormalNC", "EndOfBuffer", "SignColumn",
+	"DiffAdd", "DiffChange", "DiffDelete", "DiffText",
+}
+
+local function apply_transparency()
+	for _, group in ipairs(transparent_hls) do
+		vim.api.nvim_set_hl(0, group, { bg = "none" })
+	end
+end
+
+vim.api.nvim_create_autocmd("ColorScheme", {
+	callback = apply_transparency,
+})
+
 function ColorMyPencils(color)
 	color = color or "rose-pine-moon"
 	vim.cmd.colorscheme(color)
-
-	vim.api.nvim_set_hl(0, "Normal", { bg = "none" })
-	vim.api.nvim_set_hl(0, "NormalFloat", { bg = "none" })
+	apply_transparency()
 end
 
 return {
@@ -78,6 +91,13 @@ return {
                 disable_background = true,
                 styles = {
                     italic = false,
+                },
+                highlight_groups = {
+                    Normal = { bg = "none" },
+                    NormalNC = { bg = "none" },
+                    NormalFloat = { bg = "none" },
+                    EndOfBuffer = { bg = "none" },
+                    SignColumn = { bg = "none" },
                 },
             })
 

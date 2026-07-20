@@ -32,7 +32,7 @@ vim.opt.updatetime = 50
 
 vim.opt.showtabline = 0
 
-vim.opt.colorcolumn = "80"
+vim.opt.colorcolumn = ""
 
 vim.opt.splitbelow = false
 vim.opt.splitright = true

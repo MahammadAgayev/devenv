@@ -1,8 +1,16 @@
 {
-  "defaultProvider": "local",
-  "defaultModel": "gemma4:26b",
+  "defaultProvider": "anthropic",
+  "defaultModel": "claude-sonnet-4-6",
   "packages": [
     "https://github.com/carderne/pi-nvim"
   ],
-  "lastChangelogVersion": "0.73.1"
+  "lastChangelogVersion": "0.73.1",
+  "compaction": {
+    "enabled": false
+  },
+  "terminal": {
+    "showTerminalProgress": true
+  },
+  "theme": "dark",
+  "defaultThinkingLevel": "high"
 }
