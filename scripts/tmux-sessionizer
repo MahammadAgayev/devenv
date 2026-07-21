@@ -62,11 +62,16 @@ build_table() {
         emit_flat "$HOME/Documents/src"
         emit_flat "$HOME/src"
         for r in "${MONO_ROOTS[@]}"; do emit_mono "$r"; done
-    } | awk -v home="$HOME/" '
-        { label=$0
-          sub("^"home,"",label)
-          sub("src/code.uber.internal/","",label)
-          print label "\t" $0 }'
+    } | TSZ_SESS="$(tmux list-sessions -F '#S' 2>/dev/null)" awk -v home="$HOME/" '
+        BEGIN { n=split(ENVIRON["TSZ_SESS"], a, "\n")
+                for (i=1;i<=n;i++) if (a[i]!="") open[a[i]]=1 }
+        { path=$0
+          label=path; sub("^"home,"",label); sub("src/code.uber.internal/","",label)
+          nm=path; sub(".*/","",nm); gsub(/\./,"_",nm)
+          if (nm in open) { print "0\t\342\227\217 " label "\t" path; seen[nm]=1 }
+          else            print "1\t" label "\t" path }
+        END { for (s in open) if (!(s in seen)) print "0\t\342\227\217 " s "\t\t" s }' \
+      | sort -s -t"$(printf '\t')" -k1,1
 }
 
 [[ "$1" == --emit ]] && { build_table; exit 0; }
@@ -77,14 +82,19 @@ if [[ $# -eq 1 ]]; then
     selected="$1"
 else
     result=$(build_table | fzf \
-        --delimiter=$'\t' --with-nth=1 --print-query \
-        --prompt='jump> ' --height=40% --reverse --tiebreak=index \
-        --preview 'p=$(printf "%s" {} | cut -f2); ls -a "$p" 2>/dev/null | head -40; echo; git -C "$p" log -1 --oneline 2>/dev/null' \
+        --delimiter=$'\t' --with-nth=2 --print-query \
+        --prompt='' --height=40% --reverse --tiebreak=index \
+        --preview 'p=$(printf "%s" {} | cut -f3); ls -a "$p" 2>/dev/null | head -40; echo; git -C "$p" log -1 --oneline 2>/dev/null' \
         --preview-window=right,50%)
     query=$(sed -n 1p <<<"$result")
     picked=$(sed -n 2p <<<"$result")
     if [[ -n "$picked" ]]; then
-        selected=$(printf '%s' "$picked" | cut -f2)
+        selected=$(printf '%s' "$picked" | cut -f3)
+        # dir-less live session (col3 empty): jump straight to it
+        if [[ -z "$selected" ]]; then
+            switch_to "$(printf '%s' "$picked" | cut -f4)"
+            exit 0
+        fi
     elif [[ -n "$query" ]]; then
         selected="${query/#\~/$HOME}"
         [[ "$selected" != /* ]] && selected="$PWD/$selected"
