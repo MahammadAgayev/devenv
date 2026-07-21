@@ -62,15 +62,28 @@ build_table() {
         emit_flat "$HOME/Documents/src"
         emit_flat "$HOME/src"
         for r in "${MONO_ROOTS[@]}"; do emit_mono "$r"; done
-    } | TSZ_SESS="$(tmux list-sessions -F '#S' 2>/dev/null)" awk -v home="$HOME/" '
-        BEGIN { n=split(ENVIRON["TSZ_SESS"], a, "\n")
-                for (i=1;i<=n;i++) if (a[i]!="") open[a[i]]=1 }
+    } | TSZ_WINS="$(tmux list-windows -a -F '#S	#I	#W' 2>/dev/null)" awk -v home="$HOME/" '
+        BEGIN {
+            nw=split(ENVIRON["TSZ_WINS"], wl, "\n"); wc=0
+            for (i=1;i<=nw;i++) {
+                if (wl[i]=="") continue
+                split(wl[i], f, "\t"); wc++
+                wsess[wc]=f[1]; widx[wc]=f[2]; wname[wc]=f[3]
+                open[f[1]]=1; wincount[f[1]]++
+            }
+        }
         { path=$0
           label=path; sub("^"home,"",label); sub("src/code.uber.internal/","",label)
           nm=path; sub(".*/","",nm); gsub(/\./,"_",nm)
-          if (nm in open) { print "0\t\342\227\217 " label "\t" path; seen[nm]=1 }
-          else            print "1\t" label "\t" path }
-        END { for (s in open) if (!(s in seen)) print "0\t\342\227\217 " s "\t\t" s }' \
+          if (nm in open) { if (!(nm in lbl)) lbl[nm]=label; next }
+          print "1\t" label "\t" path }
+        END {
+            for (i=1;i<=wc;i++) {
+                s=wsess[i]; base=(s in lbl)?lbl[s]:s
+                disp=(wincount[s]>1)?(base " \342\226\270 " wname[i]):base
+                print "0\t\342\227\217 " disp "\t\t" s ":" widx[i]
+            }
+        }' \
       | sort -s -t"$(printf '\t')" -k1,1
 }
 
@@ -84,7 +97,7 @@ else
     result=$(build_table | fzf \
         --delimiter=$'\t' --with-nth=2 --print-query \
         --prompt='' --height=40% --reverse --tiebreak=index \
-        --preview 'p=$(printf "%s" {} | cut -f3); ls -a "$p" 2>/dev/null | head -40; echo; git -C "$p" log -1 --oneline 2>/dev/null' \
+        --preview 'p=$(printf "%s" {} | cut -f3); t=$(printf "%s" {} | cut -f4); if [ -n "$p" ]; then ls -a "$p" 2>/dev/null | head -40; echo; git -C "$p" log -1 --oneline 2>/dev/null; else tmux capture-pane -ep -t "$t" 2>/dev/null | head -60; fi' \
         --preview-window=right,50%)
     query=$(sed -n 1p <<<"$result")
     picked=$(sed -n 2p <<<"$result")
