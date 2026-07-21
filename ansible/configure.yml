@@ -165,6 +165,34 @@
         state: directory
         mode: '0755'
 
+    - name: Symlink Pi extensions dir (devenv)
+      file:
+        src: "{{ devenv }}/pi/extensions"
+        dest: "{{ home }}/.pi/agent/extensions"
+        state: link
+        force: true
+
+    - name: Symlink Pi lib dir (shared by devenv extensions)
+      file:
+        src: "{{ devenv }}/pi/lib"
+        dest: "{{ home }}/.pi/agent/lib"
+        state: link
+        force: true
+
+    - name: Symlink Pi skills dir (devenv)
+      file:
+        src: "{{ devenv }}/pi/skills"
+        dest: "{{ home }}/.pi/agent/skills"
+        state: link
+        force: true
+
+    - name: Symlink Pi themes dir (devenv)
+      file:
+        src: "{{ devenv }}/pi/themes"
+        dest: "{{ home }}/.pi/agent/themes"
+        state: link
+        force: true
+
     - name: Symlink Pi models config (uber only)
       file:
         src: "{{ devenv }}/pi/models.uber.json"

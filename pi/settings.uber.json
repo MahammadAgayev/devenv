@@ -1,9 +1,17 @@
 {
   "defaultProvider": "uber",
   "defaultModel": "claude-opus-4-8-thinking",
+  "defaultThinkingLevel": "high",
+  "thinkingBudgets": {
+    "minimal": 1024,
+    "low": 4096,
+    "medium": 10240,
+    "high": 32768
+  },
   "packages": [
     "https://github.com/carderne/pi-nvim",
     "npm:pi-nvim"
   ],
-  "lastChangelogVersion": "0.75.4"
+  "lastChangelogVersion": "0.80.3",
+  "theme": "dark-transparent"
 }
