@@ -41,6 +41,13 @@ When your changes create orphans:
 
 The test: Every changed line should trace directly to the user's request.
 
+## 5. Git Staging
+
+**Never `git add` / stage the `.pi/tasks/` folder.**
+
+- `.pi/tasks/` holds local handoff docs. Do not stage or commit anything under it.
+- When staging with a broad path (e.g. `git add .` or `git add .pi`), exclude `.pi/tasks/` explicitly.
+
 ## 4. Goal-Driven Execution
 
 **Define success criteria. Loop until verified.**

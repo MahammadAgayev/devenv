@@ -114,9 +114,9 @@
         state: link
         force: true
 
-    - name: Symlink CLAUDE.md
+    - name: Symlink Claude instructions (CLAUDE.md)
       file:
-        src: "{{ devenv }}/claude/CLAUDE.md"
+        src: "{{ devenv }}/agents/AGENTS.md"
         dest: "{{ home }}/.claude/CLAUDE.md"
         state: link
         force: true
@@ -190,6 +190,13 @@
       file:
         src: "{{ devenv }}/pi/themes"
         dest: "{{ home }}/.pi/agent/themes"
+        state: link
+        force: true
+
+    - name: Symlink Pi instructions (AGENTS.md)
+      file:
+        src: "{{ devenv }}/agents/AGENTS.md"
+        dest: "{{ home }}/.pi/agent/AGENTS.md"
         state: link
         force: true
 
