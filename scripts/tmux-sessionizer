@@ -58,22 +58,19 @@ def children(root: Path):
 
 
 def metadata_dirs(root: Path) -> list[str]:
-    """Dirs holding a METADATA file. Reads the git index (instant) when root is
-    a git work tree; falls back to an rg tree walk otherwise."""
-    is_git = run(["git", "-C", str(root), "rev-parse",
-                  "--is-inside-work-tree"]).strip() == "true"
-    if is_git:
-        out = run(["git", "-C", str(root), "ls-files", "-z", "--", "*METADATA"])
-        dirs = set()
-        for line in out.split("\0"):
-            if line == "METADATA":
-                dirs.add(str(root))
-            elif line.endswith("/METADATA"):
-                dirs.add(str(root / line[: -len("/METADATA")]))
-        return sorted(dirs)
-    out = run(["rg", "--files", "--no-messages", "-g", "METADATA", str(root)])
-    return sorted({line[: -len("/METADATA")] for line in out.splitlines()
-                   if line.endswith("/METADATA")})
+    """Dirs holding a METADATA file, read from the git index (instant). If root
+    isn't a git work tree we return nothing rather than risk a slow tree walk."""
+    if run(["git", "-C", str(root), "rev-parse",
+            "--is-inside-work-tree"]).strip() != "true":
+        return []
+    out = run(["git", "-C", str(root), "ls-files", "-z", "--", "*METADATA"])
+    dirs = set()
+    for line in out.split("\0"):
+        if line == "METADATA":
+            dirs.add(str(root))
+        elif line.endswith("/METADATA"):
+            dirs.add(str(root / line[: -len("/METADATA")]))
+    return sorted(dirs)
 
 
 def write_metadata_cache(root: Path, dest: Path):
