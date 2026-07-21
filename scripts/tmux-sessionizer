@@ -1,23 +1,20 @@
 #!/usr/bin/env python3
-"""tmux-sessionizer — unified jump picker.
+"""tmux-sessionizer — local tmux jump picker.
 
-One fzf list, three kinds of rows, no duplicates:
+One fzf list, two kinds of rows, no duplicates:
   • local tmux windows   (open work; single-window sessions = one clean row)
   • project directories   (not yet open; selecting one creates a session)
-  • remote tmux windows   (windows of remote servers reached via live tssh)
 
-Cross-remote session jumping stays on tmux's own `C-b s`; this tool owns
-window-level jumping so you never need the nested `C-b b n` dance.
+Local-only by design: no ssh/remote awareness. tssh connections just show up
+as ordinary local sessions.
 """
 
 from __future__ import annotations
 
 import os
-import re
 import subprocess
 import sys
 import time
-from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 HOME = Path.home()
@@ -30,10 +27,6 @@ DENY = {"Library", "Applications", "Movies", "Music", "Pictures", "Public",
         "Desktop", "Downloads", "Zoom", "google-workspace", "go-code", "fievel"}
 
 WIN_FMT = "#{session_name}\t#{window_index}\t#{window_name}\t#{window_active}"
-
-# ssh flags that consume the following token (so we skip it when finding host)
-SSH_OPT_WITH_ARG = {"-b", "-c", "-D", "-E", "-e", "-F", "-I", "-i", "-J", "-L",
-                    "-l", "-m", "-O", "-o", "-p", "-Q", "-R", "-S", "-W", "-w"}
 
 
 # --- shell helpers ---------------------------------------------------------
@@ -50,11 +43,6 @@ def tmux(*args: str) -> str:
     return run(["tmux", *args])
 
 
-def ssh(host: str, remote_cmd: str, timeout: float = 3) -> str:
-    return run(["ssh", "-o", "BatchMode=yes", "-o", f"ConnectTimeout={int(timeout)}",
-                host, remote_cmd], timeout=timeout + 1)
-
-
 # --- discovery -------------------------------------------------------------
 
 def denied(name: str) -> bool:
@@ -69,6 +57,30 @@ def children(root: Path):
             yield p
 
 
+def metadata_dirs(root: Path) -> list[str]:
+    """Dirs holding a METADATA file. Reads the git index (instant) when root is
+    a git work tree; falls back to an rg tree walk otherwise."""
+    is_git = run(["git", "-C", str(root), "rev-parse",
+                  "--is-inside-work-tree"]).strip() == "true"
+    if is_git:
+        out = run(["git", "-C", str(root), "ls-files", "-z", "--", "*METADATA"])
+        dirs = set()
+        for line in out.split("\0"):
+            if line == "METADATA":
+                dirs.add(str(root))
+            elif line.endswith("/METADATA"):
+                dirs.add(str(root / line[: -len("/METADATA")]))
+        return sorted(dirs)
+    out = run(["rg", "--files", "--no-messages", "-g", "METADATA", str(root)])
+    return sorted({line[: -len("/METADATA")] for line in out.splitlines()
+                   if line.endswith("/METADATA")})
+
+
+def write_metadata_cache(root: Path, dest: Path):
+    dirs = metadata_dirs(root)
+    dest.write_text("\n".join(dirs) + ("\n" if dirs else ""))
+
+
 def mono(root: Path, rebuild: bool):
     """Project dirs of a monorepo = the dir of each METADATA file. Cached; a
     stale cache (>12h) is served now and refreshed in the background."""
@@ -77,14 +89,8 @@ def mono(root: Path, rebuild: bool):
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
     cache = CACHE_DIR / (str(root).replace("/", "_") + ".list")
 
-    def rebuild_cache(dest: Path):
-        out = run(["rg", "--files", "--no-messages", "-g", "METADATA", str(root)])
-        dirs = sorted({line[: -len("/METADATA")] for line in out.splitlines()
-                       if line.endswith("/METADATA")})
-        dest.write_text("\n".join(dirs) + ("\n" if dirs else ""))
-
     if rebuild or not cache.exists():
-        rebuild_cache(cache)
+        write_metadata_cache(root, cache)
     elif time.time() - cache.stat().st_mtime > 12 * 3600:
         subprocess.Popen(  # background refresh, serve current cache now
             [sys.executable, __file__, "--refresh-mono", str(root)],
@@ -126,41 +132,11 @@ def parse_windows(out: str) -> dict[str, list[tuple[str, str, bool]]]:
     return by_sess
 
 
-def session_host(sess: str) -> str | None:
-    """If a local session is a tssh connection, return its ssh host."""
-    pid = tmux("list-panes", "-t", sess, "-F", "#{pane_pid}").splitlines()
-    if not pid:
-        return None
-    kids = run(["pgrep", "-P", pid[0]]).split()
-    for child in kids:
-        cmd = run(["ps", "-o", "command=", "-p", child])
-        host = ssh_host_of(cmd)
-        if host:
-            return host
-    return None
-
-
-def ssh_host_of(cmd: str) -> str | None:
-    toks = cmd.split()
-    i = next((j for j, t in enumerate(toks)
-              if os.path.basename(t) == "ssh"), None)
-    if i is None:
-        return None
-    i += 1
-    while i < len(toks):
-        t = toks[i]
-        if t.startswith("-"):
-            i += 2 if t in SSH_OPT_WITH_ARG else 1
-            continue
-        return t
-    return None
-
-
 # --- table -----------------------------------------------------------------
 
 def build_table(rebuild: bool = False) -> list[tuple]:
-    """Rows: (action, bucket, display, *targets). Sorted by bucket, stable.
-    bucket 0 = open local windows, 2 = closed dirs, 3 = remote windows."""
+    """Rows: (action, bucket, display, target). Sorted by bucket, stable.
+    bucket 0 = open local windows, 2 = closed dirs."""
     dirs = list(iter_dirs(rebuild))
     dir_by_name: dict[str, Path] = {}
     for p in dirs:
@@ -169,13 +145,8 @@ def build_table(rebuild: bool = False) -> list[tuple]:
     local = parse_windows(tmux("list-windows", "-a", "-F", WIN_FMT))
     rows: list[tuple] = []
     open_names: set[str] = set()
-    hosts: dict[str, str] = {}  # ssh host -> local tssh session
 
     for sess, wins in local.items():
-        host = session_host(sess)
-        if host:  # tssh connection: represented by its remote windows below
-            hosts.setdefault(host, sess)
-            continue
         open_names.add(sess)
         disp = label(dir_by_name[sess]) if sess in dir_by_name else sess
         if len(wins) == 1:
@@ -187,23 +158,6 @@ def build_table(rebuild: bool = False) -> list[tuple]:
     for p in dirs:
         if sess_name(p) not in open_names:
             rows.append(("dir", 2, label(p), str(p)))
-
-    if hosts:
-        with ThreadPoolExecutor(max_workers=len(hosts)) as pool:
-            results = list(pool.map(
-                lambda h: (h, hosts[h], parse_windows(
-                    ssh(h, f"tmux list-windows -a -F '{WIN_FMT}' 2>/dev/null"))),
-                hosts))
-        for host, lsess, rwins in results:
-            for sess, wins in rwins.items():
-                if len(wins) == 1:
-                    rows.append(("remotewin", 3, f"{host} \u25b8 {sess}",
-                                 host, lsess, sess))
-                else:
-                    for idx, wname, _ in wins:
-                        rows.append(("remotewin", 3,
-                                     f"{host} \u25b8 {sess} \u25b8 {wname}",
-                                     host, lsess, f"{sess}:{idx}"))
 
     rows.sort(key=lambda r: r[1])  # stable
     return rows
@@ -253,14 +207,6 @@ def jump_dir(path: Path):
     switch_to(name)
 
 
-def jump_remote(host: str, lsess: str, target: str):
-    """Show the tssh connection locally, then drive the remote server's own
-    client (shared unix socket, one client per remote) via ssh."""
-    switch_to(lsess)
-    ssh(host, "tty=$(tmux list-clients -F '#{client_tty}' | head -1); "
-              f"tmux switch-client -c \"$tty\" -t '{target}'")
-
-
 # --- fzf -------------------------------------------------------------------
 
 PREVIEW = (
@@ -300,10 +246,7 @@ def main():
         root = Path(sys.argv[2])
         cache = CACHE_DIR / (str(root).replace("/", "_") + ".list")
         tmp = cache.with_suffix(".tmp")
-        out = run(["rg", "--files", "--no-messages", "-g", "METADATA", str(root)])
-        dirs = sorted({l[: -len("/METADATA")] for l in out.splitlines()
-                       if l.endswith("/METADATA")})
-        tmp.write_text("\n".join(dirs) + ("\n" if dirs else ""))
+        write_metadata_cache(root, tmp)
         tmp.replace(cache)
         return
     if len(sys.argv) == 2 and sys.argv[1] == "--emit":
@@ -324,8 +267,6 @@ def main():
         jump_dir(Path(cols[3]).expanduser())
     elif action == "win":
         switch_to(cols[3])
-    elif action == "remotewin":
-        jump_remote(cols[3], cols[4], cols[5])
 
 
 if __name__ == "__main__":
