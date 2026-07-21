@@ -232,6 +232,13 @@
         force: true
       when: profile == 'personal'
 
+    - name: Symlink Pi keybindings config (devenv)
+      file:
+        src: "{{ devenv }}/pi/keybindings.json"
+        dest: "{{ home }}/.pi/agent/keybindings.json"
+        state: link
+        force: true
+
     - name: Install devenv post-merge hook
       file:
         src: "{{ devenv }}/git-hooks/devenv-post-merge"
