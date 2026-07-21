@@ -73,7 +73,7 @@
       changed_when: false
 
     - name: Check if Pi CLI installed
-      shell: which pi
+      shell: command -v pi || test -x {{ home }}/.bun/bin/pi
       register: pi_check
       changed_when: false
       failed_when: false
@@ -81,6 +81,10 @@
     - name: Install Pi CLI (via bun)
       shell: "{{ bun_bin.stdout }} install -g @earendil-works/pi-coding-agent"
       when: pi_check.rc != 0
+
+    - name: Verify Pi CLI is available
+      shell: command -v pi || test -x {{ home }}/.bun/bin/pi
+      changed_when: false
 
     - name: Update nvim-treesitter plugin
       shell: nvim --headless -c "Lazy! update nvim-treesitter" -c "qa" 2>/dev/null || true
