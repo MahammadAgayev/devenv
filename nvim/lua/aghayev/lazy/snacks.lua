@@ -12,6 +12,7 @@ return {
             enabled = true,
             layout = { border = "none" },
         },
+        image = { enabled = false },
         words = { enabled = true },
     },
     keys = {

@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
+
 switch_to() {
     if [[ -z $TMUX ]]; then
-        tmux attach-session -t $1
+        tmux attach-session -t "$1"
     else
-        tmux switch-client -t $1
+        tmux switch-client -t "$1"
     fi
 }
 
@@ -15,40 +16,113 @@ hydrate() {
     if [[ -f "$2/.ssh" ]]; then
         local ssh_target
         ssh_target=$(cat "$2/.ssh")
-        tmux send-keys -t $1 "ssh $ssh_target" C-m
+        tmux send-keys -t "$1" "ssh $ssh_target" C-m
     fi
-    if [ -f $2/.tmux-sessionizer ]; then
-        tmux send-keys -t $1 "source $2/.tmux-sessionizer" C-m
-    elif [ -f $HOME/.tmux-sessionizer ]; then
-        tmux send-keys -t $1 "source $HOME/.tmux-sessionizer" C-m
+    if [ -f "$2/.tmux-sessionizer" ]; then
+        tmux send-keys -t "$1" "source $2/.tmux-sessionizer" C-m
+    elif [ -f "$HOME/.tmux-sessionizer" ]; then
+        tmux send-keys -t "$1" "source $HOME/.tmux-sessionizer" C-m
     fi
 }
 
+# --- discovery -------------------------------------------------------------
+# Monorepo roots are fixed: scanned for project dirs (dir of each METADATA).
+# Everything else is flat: depth-1 children, minus known-useless entries.
+
+MONO_ROOTS=("$HOME/go-code" "$HOME/fievel")
+CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/tmux-sessionizer"
+
+# depth-1 dirs to drop everywhere: dotfiles, macOS/system, junk, monorepo roots
+DENY='/(\.[^/]*|Library|Applications|Movies|Music|Pictures|Public|Desktop|Downloads|Zoom|google-workspace|go-code|fievel)$'
+
+emit_home() {
+    # home projects, depth-1
+    find "$HOME" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | grep -vE "$DENY"
+}
+
+emit_flat() {
+    [[ -d "$1" ]] || return
+    find "$1" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | grep -vE "$DENY"
+}
+
+emit_mono() {
+    local root="$1" rebuild="$2"
+    [[ -d "$root" ]] || return
+    mkdir -p "$CACHE_DIR"
+    local cache="$CACHE_DIR/$(printf '%s' "$root" | tr '/' '_').list"
+    if [[ "$rebuild" == rebuild || ! -f "$cache" ]]; then
+        rg --files --no-messages -g METADATA "$root" 2>/dev/null \
+            | sed 's:/METADATA$::' | sort -u > "$cache"
+    elif [[ -n $(find "$cache" -mmin +720 2>/dev/null) ]]; then
+        # stale (>12h): refresh in the background, serve current cache now
+        ( rg --files --no-messages -g METADATA "$root" 2>/dev/null \
+            | sed 's:/METADATA$::' | sort -u > "$cache.tmp" \
+            && mv "$cache.tmp" "$cache" ) >/dev/null 2>&1 &
+    fi
+    cat "$cache"
+}
+
+build_table() {
+    local rebuild="$1"
+    {
+        emit_home
+        emit_flat "$HOME/Uber"
+        emit_flat "$HOME/Documents"
+        emit_flat "$HOME/Documents/src"
+        emit_flat "$HOME/src"
+        emit_mono "$HOME/go-code" "$rebuild"
+        emit_mono "$HOME/fievel" "$rebuild"
+    } | awk -v home="$HOME/" '
+        { label=$0
+          sub("^"home,"",label)
+          sub("src/code.uber.internal/","",label)
+          print label "\t" $0 }'
+}
+
+# hidden modes used by fzf reload
+case "$1" in
+    --emit)         build_table; exit 0 ;;
+    --emit-rebuild) build_table rebuild; exit 0 ;;
+esac
+
+# --- selection -------------------------------------------------------------
+
 if [[ $# -eq 1 ]]; then
-    selected=$1
+    selected="$1"
 else
-    # If someone wants to make this extensible, i'll accept
-    # PR
-    selected=$(find ~/ ~/go-code/src/*/* /Users/aghayev/Documents/src /Users/aghayev/Uber -mindepth 1 -maxdepth 3 -type d | fzf)
+    result=$(build_table | fzf \
+        --delimiter=$'\t' --with-nth=1 --print-query \
+        --prompt='jump> ' --height=40% --reverse --tiebreak=index \
+        --preview 'p=$(printf "%s" {} | cut -f2); ls -a "$p" 2>/dev/null | head -40; echo; git -C "$p" log -1 --oneline 2>/dev/null' \
+        --preview-window=right,50% \
+        --bind "ctrl-r:reload($0 --emit-rebuild)")
+    query=$(sed -n 1p <<<"$result")
+    picked=$(sed -n 2p <<<"$result")
+    if [[ -n "$picked" ]]; then
+        selected=$(printf '%s' "$picked" | cut -f2)
+    elif [[ -n "$query" ]]; then
+        # no match: treat the typed query as a directory to jump to
+        selected="${query/#\~/$HOME}"
+        [[ "$selected" != /* ]] && selected="$PWD/$selected"
+    fi
 fi
 
-if [[ -z $selected ]]; then
-    exit 0
-fi
+[[ -z "$selected" ]] && exit 0
+[[ -d "$selected" ]] || exit 0
 
 selected_name=$(basename "$selected" | tr . _)
 tmux_running=$(pgrep tmux)
 
 if [[ -z $TMUX ]] && [[ -z $tmux_running ]]; then
-    tmux new-session -s $selected_name -c $selected
-    hydrate $selected_name $selected
+    tmux new-session -s "$selected_name" -c "$selected"
+    hydrate "$selected_name" "$selected"
     exit 0
 fi
 
-if ! has_session $selected_name; then
-    tmux new-session -ds $selected_name -c $selected
+if ! has_session "$selected_name"; then
+    tmux new-session -ds "$selected_name" -c "$selected"
     sleep 0.1
-    hydrate $selected_name $selected
+    hydrate "$selected_name" "$selected"
 fi
 
-switch_to $selected_name
+switch_to "$selected_name"
