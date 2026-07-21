@@ -167,8 +167,16 @@ def emit(rebuild: bool = False):
 
 # --- jumps -----------------------------------------------------------------
 
+def inside_tmux() -> bool:
+    """True when a tmux server with a client already exists. $TMUX isn't
+    exported to us when launched via run-shell/neww, so we also probe the
+    server directly — trusting only $TMUX makes switch_to fall through to a
+    blocking attach-session that wedges the client."""
+    return bool(os.environ.get("TMUX") or tmux("list-clients").strip())
+
+
 def switch_to(target: str):
-    if os.environ.get("TMUX"):
+    if inside_tmux():
         tmux("switch-client", "-t", target)
     else:
         tmux("attach-session", "-t", target)
@@ -193,7 +201,7 @@ def jump_dir(path: Path):
     if not path.is_dir():
         return
     name = sess_name(path)
-    if not os.environ.get("TMUX") and not run(["pgrep", "tmux"]).strip():
+    if not inside_tmux() and not run(["pgrep", "tmux"]).strip():
         tmux("new-session", "-s", name, "-c", str(path))
         hydrate(name, path)
         return
