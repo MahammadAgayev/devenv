@@ -172,13 +172,6 @@
         state: link
         force: true
 
-    - name: Symlink Pi lib dir (shared by devenv extensions)
-      file:
-        src: "{{ devenv }}/pi/lib"
-        dest: "{{ home }}/.pi/agent/lib"
-        state: link
-        force: true
-
     - name: Symlink Pi skills dir (devenv)
       file:
         src: "{{ devenv }}/pi/skills"

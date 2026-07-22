@@ -22,7 +22,7 @@ import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { PATHS } from "../lib/paths.ts";
+import { PATHS } from "./lib/paths.ts";
 import { Type } from "typebox";
 
 // Skill loading mode for marketplace skills:

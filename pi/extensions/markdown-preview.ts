@@ -25,7 +25,7 @@ import { homedir } from "node:os";
 import { spawn } from "node:child_process";
 import { ScrollableOverlay } from "./lib/scrollable-overlay.ts";
 import { showSelectOverlay } from "./lib/tui-shared.ts";
-import { PATHS } from "../lib/paths.ts";
+import { PATHS } from "./lib/paths.ts";
 
 // Lazy-load pi-tui Markdown constructor (runtime-only, not a devDependency).
 let _tui: typeof import("@earendil-works/pi-tui") | null = null;

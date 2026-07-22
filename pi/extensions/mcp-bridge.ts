@@ -21,7 +21,7 @@ import {
   mkdirSync,
 } from "fs";
 import { join } from "path";
-import { PATHS } from "../lib/paths.ts";
+import { PATHS } from "./lib/paths.ts";
 import { truncateHead, DEFAULT_MAX_BYTES, DEFAULT_MAX_LINES, formatSize } from "@earendil-works/pi-coding-agent";
 
 export interface McpLocalConfig {
