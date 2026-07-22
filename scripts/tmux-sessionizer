@@ -36,8 +36,8 @@ hydrate() {
 # Monorepo roots (fixed): project dir = dir of each git-tracked METADATA file,
 # read straight from the git index (instant). Everything else is flat depth-1.
 
-MONO_ROOTS=("$HOME/go-code" "$HOME/fievel")
-DENY='/(\.[^/]*|Library|Applications|Movies|Music|Pictures|Public|Desktop|Downloads|Zoom|google-workspace|go-code|fievel)$'
+MONO_ROOTS=("$HOME/go-code" "$HOME/fievel" "$HOME/web-code")
+DENY='/(\.[^/]*|Library|Applications|Movies|Music|Pictures|Public|Desktop|Downloads|Zoom|google-workspace|go-code|fievel|web-code)$'
 
 emit_flat() {
     [[ -d "$1" ]] || return
@@ -96,9 +96,7 @@ if [[ $# -eq 1 ]]; then
 else
     result=$(build_table | fzf \
         --delimiter=$'\t' --with-nth=2 --print-query \
-        --prompt='' --height=40% --reverse --tiebreak=index \
-        --preview 'p=$(printf "%s" {} | cut -f3); t=$(printf "%s" {} | cut -f4); if [ -n "$p" ]; then ls -a "$p" 2>/dev/null | head -40; echo; git -C "$p" log -1 --oneline 2>/dev/null; else tmux capture-pane -ep -t "$t" 2>/dev/null | head -60; fi' \
-        --preview-window=right,50%)
+        --prompt='' --height=100% --reverse --tiebreak=index)
     query=$(sed -n 1p <<<"$result")
     picked=$(sed -n 2p <<<"$result")
     if [[ -n "$picked" ]]; then
