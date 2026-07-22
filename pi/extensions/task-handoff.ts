@@ -17,14 +17,17 @@
 import { CONFIG_DIR_NAME, type ExtensionAPI, type ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
 import type { AutocompleteItem } from "@earendil-works/pi-tui";
 import { existsSync, mkdirSync, readFileSync, readdirSync } from "node:fs";
+import { homedir } from "node:os";
 import { basename, join } from "node:path";
 
-function tasksDir(cwd: string): string {
-  return join(cwd, CONFIG_DIR_NAME, "tasks");
+// Tasks live under the global agent config dir (~/.pi/tasks), not per-repo, so
+// handoffs survive across repos and never land inside a git working tree.
+function tasksDir(): string {
+  return join(homedir(), CONFIG_DIR_NAME, "tasks");
 }
 
-function taskPath(cwd: string, name: string): string {
-  return join(tasksDir(cwd), `${sanitize(name)}.md`);
+function taskPath(name: string): string {
+  return join(tasksDir(), `${sanitize(name)}.md`);
 }
 
 // Keep names filesystem-safe and predictable for autocompletion.
@@ -36,8 +39,8 @@ function sanitize(name: string): string {
     .replace(/^-+|-+$/g, "");
 }
 
-function listTasks(cwd: string): string[] {
-  const dir = tasksDir(cwd);
+function listTasks(): string[] {
+  const dir = tasksDir();
   if (!existsSync(dir)) return [];
   return readdirSync(dir)
     .filter((f) => f.endsWith(".md"))
@@ -45,8 +48,8 @@ function listTasks(cwd: string): string[] {
     .sort();
 }
 
-function completions(cwd: string, prefix: string): AutocompleteItem[] | null {
-  const items = listTasks(cwd)
+function completions(prefix: string): AutocompleteItem[] | null {
+  const items = listTasks()
     .filter((name) => name.startsWith(prefix))
     .map((name) => ({ value: name, label: name, description: "existing task" }));
   return items.length > 0 ? items : null;
@@ -66,15 +69,9 @@ function template(name: string): string {
 }
 
 export default function (pi: ExtensionAPI) {
-  // Completion callbacks receive no ctx, so track the session cwd ourselves.
-  let currentCwd = process.cwd();
-  pi.on("session_start", (_event, ctx) => {
-    currentCwd = ctx.cwd;
-  });
-
   pi.registerCommand("handoff", {
-    description: "Write/update the handoff doc for a task (.pi/tasks/<name>.md)",
-    getArgumentCompletions: (prefix) => completions(currentCwd, prefix),
+    description: "Write/update the handoff doc for a task (~/.pi/tasks/<name>.md)",
+    getArgumentCompletions: (prefix) => completions(prefix),
     handler: async (args: string, ctx: ExtensionCommandContext) => {
       const name = sanitize(args);
       if (!name) {
@@ -82,9 +79,9 @@ export default function (pi: ExtensionAPI) {
         return;
       }
 
-      const dir = tasksDir(ctx.cwd);
+      const dir = tasksDir();
       mkdirSync(dir, { recursive: true });
-      const path = taskPath(ctx.cwd, name);
+      const path = taskPath(name);
       const exists = existsSync(path);
       const current = exists ? readFileSync(path, "utf-8") : template(name);
       const now = new Date().toISOString().slice(0, 16).replace("T", " ");
@@ -111,8 +108,8 @@ export default function (pi: ExtensionAPI) {
   });
 
   pi.registerCommand("takeover", {
-    description: "Load a task's handoff doc into this session (.pi/tasks/<name>.md)",
-    getArgumentCompletions: (prefix) => completions(currentCwd, prefix),
+    description: "Load a task's handoff doc into this session (~/.pi/tasks/<name>.md)",
+    getArgumentCompletions: (prefix) => completions(prefix),
     handler: async (args: string, ctx: ExtensionCommandContext) => {
       const name = sanitize(args);
       if (!name) {
@@ -120,9 +117,9 @@ export default function (pi: ExtensionAPI) {
         return;
       }
 
-      const path = taskPath(ctx.cwd, name);
+      const path = taskPath(name);
       if (!existsSync(path)) {
-        const avail = listTasks(ctx.cwd);
+        const avail = listTasks();
         ctx.ui.notify(
           `No handoff doc for "${name}".` + (avail.length ? ` Available: ${avail.join(", ")}` : " No tasks yet."),
           "error",

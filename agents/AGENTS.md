@@ -43,10 +43,10 @@ The test: Every changed line should trace directly to the user's request.
 
 ## 5. Git Staging
 
-**Never `git add` / stage the `.pi/tasks/` folder.**
+**Handoff docs live in `~/.pi/tasks/` (outside any repo) — never commit task docs.**
 
-- `.pi/tasks/` holds local handoff docs. Do not stage or commit anything under it.
-- When staging with a broad path (e.g. `git add .` or `git add .pi`), exclude `.pi/tasks/` explicitly.
+- `~/.pi/tasks/<name>.md` holds local handoff docs written by `/handoff`. They are global and repo-independent, so they normally can't be staged by accident.
+- If a `.pi/tasks/` folder ever appears inside a repo, do not stage or commit anything under it. When staging with a broad path (e.g. `git add .` or `git add .pi`), exclude it explicitly.
 
 ## 4. Goal-Driven Execution
 
