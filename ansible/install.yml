@@ -34,7 +34,7 @@
       register: omz
 
     - name: Install Oh My Zsh
-      shell: curl -fsSL https://raw.github.com/ohmyzsh/ohmyzsh/master/tools/install.sh | sh -s -- --unattended
+      shell: curl -fsSL https://raw.github.com/ohmyzsh/ohmyzsh/master/tools/install.sh | KEEP_ZSHRC=yes sh -s -- --unattended
       when: not omz.stat.exists
 
     - name: Install Powerlevel10k
