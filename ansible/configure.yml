@@ -165,26 +165,8 @@
         state: directory
         mode: '0755'
 
-    - name: Symlink Pi extensions dir (devenv)
-      file:
-        src: "{{ devenv }}/pi/extensions"
-        dest: "{{ home }}/.pi/agent/extensions"
-        state: link
-        force: true
-
-    - name: Symlink Pi skills dir (devenv)
-      file:
-        src: "{{ devenv }}/pi/skills"
-        dest: "{{ home }}/.pi/agent/skills"
-        state: link
-        force: true
-
-    - name: Symlink Pi themes dir (devenv)
-      file:
-        src: "{{ devenv }}/pi/themes"
-        dest: "{{ home }}/.pi/agent/themes"
-        state: link
-        force: true
+    # Pi extensions/skills/themes/registry are loaded via the "~/devenv" package
+    # entry in settings (pi/settings.*.json), not symlinked. See pi/README.md.
 
     - name: Symlink Pi instructions (AGENTS.md)
       file:

@@ -11,13 +11,40 @@
  */
 
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 function getHome(): string {
   return process.env.HOME ?? homedir();
 }
 
+/**
+ * The devenv repo root, resolved relative to THIS module. Works whether the
+ * repo is symlinked into ~/.pi/agent (dev; node resolves the symlink) or cloned
+ * as a pi package under ~/.pi/agent/git/… (`pi install`). `DEVENV_ROOT` overrides
+ * it for isolated testing.
+ *
+ * paths.ts lives at `pi/extensions/lib/paths.ts`, so the repo root is `../../..`.
+ */
+function getDevenvRoot(): string {
+  return process.env.DEVENV_ROOT ?? resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
+}
+
 export const PATHS = {
+  // ── Devenv / pi config roots (module-relative) ─────────────────────────
+  /** The devenv repo root (holds ansible/, agents/, pi/, …). */
+  get devenvRoot(): string {
+    return getDevenvRoot();
+  },
+  /** The `pi/` config dir shipping these extensions (extensions/, registry/, themes/). */
+  get piConfigDir(): string {
+    return process.env.PI_CONFIG_DIR ?? join(this.devenvRoot, "pi");
+  },
+  /** Capability registry files (`pi/registry/*.md`). `PI_REGISTRY_DIR` overrides. */
+  get registryDir(): string {
+    return process.env.PI_REGISTRY_DIR ?? join(this.piConfigDir, "registry");
+  },
+
   // ── Roots ────────────────────────────────────────────────────────────────
   get stateRoot(): string {
     return process.env.STATE_ROOT ?? join(getHome(), ".local");

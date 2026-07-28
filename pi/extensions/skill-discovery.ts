@@ -21,7 +21,6 @@ import { execFile, execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 import { PATHS } from "./lib/paths.ts";
 import { Type } from "typebox";
 
@@ -104,8 +103,10 @@ function readSkillName(skillDir: string): string | null {
   }
 }
 
+// The devenv repo root (holds playground skills + this config). Resolved
+// centrally in lib/paths.ts so it works symlinked or installed as a package.
 function playgroundRoot(): string {
-  return resolve(dirname(fileURLToPath(import.meta.url)), "../..");
+  return PATHS.devenvRoot;
 }
 
 // Run the canonical ranker (agents/lib/find-skill.js) and return its candidates,
