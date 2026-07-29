@@ -2,13 +2,13 @@
  * capabilities.ts — discover the capability registry (pi/registry/*.md).
  *
  * Used by registry.ts to expose each file's `prompt:` flavor as an in-context
- * /<cmd>. The subagent tool reads the same files via subagent/agents.ts.
+ * /<cmd>. The `agent` tool family reads the same files via agent/agents.ts.
  */
 
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { parseFrontmatter } from "@earendil-works/pi-coding-agent";
-import { PATHS } from "../paths.ts";
+import { PATHS } from "./paths.ts";
 
 export interface Capability {
   name: string;

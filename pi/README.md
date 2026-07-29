@@ -9,13 +9,13 @@ top-level config files (settings/models/keybindings/AGENTS.md).
 | Folder | Loaded as | What |
 |--------|-----------|------|
 | `extensions/` | package extensions | TypeScript extensions (tools, commands, UI) |
-| `registry/` | resolved by extensions | Capability library — one file, exposed as prompt and/or subagent |
+| `registry/` | resolved by extensions | Capability library — one file, exposed as prompt and/or agent |
 | `skills/` | package skills | Skills (auto-discovered by intent) |
 | `themes/` | package themes | Color themes |
 
 The repo root `package.json` declares the `pi` manifest
 (`extensions`/`skills`/`themes` under `pi/`). `registry/` isn't a native pi
-resource type — `registry.ts`/`subagent/` find it via `lib/paths.ts`, which
+resource type — `registry.ts`/`agent/` find it via `lib/paths.ts`, which
 resolves module-relative so it works both as a package and symlinked.
 
 `settings.uber.json` / `models.uber.json` symlink to `settings.json` / `models.json`
@@ -35,7 +35,7 @@ pi install git:github.com/MahammadAgayev/devenv
 
 This clones the repo under `~/.pi/agent/git/…` and loads `pi/extensions`,
 `pi/skills`, and `pi/themes`. Extensions auto-load; registry capabilities
-register their `/…` commands; the `subagent` tool comes from `subagent/`. Paths
+register their `/…` commands; the `agent` tool family comes from `agent/`. Paths
 resolve relative to the installed package (see `lib/paths.ts`), so it works from
 the clone without any symlinks. Run `pi update --all` to pull updates.
 
@@ -46,7 +46,7 @@ perms, `code-mcp`). Copy the parts you want into your own
 or `tokyonight-night`) and `defaultThinkingLevel`. Use `pi config` to
 enable/disable individual resources from the installed package.
 
-## The capability / subagent extensions
+## The capability / agent extensions
 
 Standalone top-level extensions (each auto-loaded on its own, matching the rest
 of `extensions/`):
@@ -54,9 +54,9 @@ of `extensions/`):
 ```
 extensions/
 ├── registry.ts       # /<prompt> capabilities (/simplify, /review, /explore, /tdd)
-├── subagent/         # the `subagent` tool (single / parallel / chain), registry-backed
+├── agent/            # the `agent` tool family + /agent command + live widget
 ├── readonly-bash.ts  # global read-only shell tool
-└── lib/agents/       # capabilities.ts — the shared registry reader
+└── lib/capabilities.ts  # the shared registry reader
 ```
 
 ## Capability registry
@@ -68,40 +68,64 @@ marks how it's exposed — the body is the single source of truth for both flavo
 ---
 name: explore
 prompt: explore              # → /explore   expands the body in-context
-agent:  explorer             # → callable via the subagent tool (name: explorer)
-description: <one-liner>     # required to be callable as a subagent
-tools:  read,grep,find,ls,readonly_bash   # subagent tool allowlist
-model:  <optional override>
+agent:  explorer             # → callable via the `agent` tool (name: explorer)
+description: <one-liner>     # required to be callable as an agent
+tools:  read,grep,find,ls,readonly_bash   # agent tool allowlist
+model:  <optional override>   # passed through as --model to the subprocess
 ---
 <instructions>
 ```
 
 Add a capability = drop one file. Give it a `prompt:` for the in-context command,
-an `agent:` + `description:` to make it callable as a subagent, or both.
+an `agent:` + `description:` to make it callable as an agent, or both.
 Current: `simplify`/`simplifier`, `review`/`reviewer`, `explore`/`explorer`
 (explore is prompt+read-only recon), `scout`, `plan`/`planner`, `work`/`worker`
-(subagent-only), and `tdd` (prompt-only — the red→green loop reference).
+(agent-only), and `tdd` (prompt-only — the red→green loop reference).
 
 `registry.ts` registers only the **prompt** commands (`/simplify`, `/review`, …).
-The subagent flavor is served by the `subagent` tool (see below).
+The agent flavor is served by the `agent` tool family (see below).
 
-## Subagents (the `subagent` tool)
+## Agents (the `agent` tool family)
 
-Ported from pi's official subagent example, adapted to source agents from the
-capability registry instead of `~/.pi/agent/agents/`. The model calls the
-`subagent` tool to delegate work to a blank-context `pi` subprocess:
+Background-native delegation, adapted from pi's official subagent example but
+sourcing agents from the capability registry instead of `~/.pi/agent/agents/`.
+One engine (`agent/runtime.ts`): each run is a blank-context `pi` subprocess
+whose state is persisted to disk (`<stateRoot>/pi-bg-runs/<runId>/`) and
+reconciled by pid-liveness after a soft `/reload`.
 
-- **single** — `{ agent, task }`: one agent, one task.
-- **parallel** — `{ tasks: [{agent, task}, …] }`: up to 8 tasks, 4 concurrent,
-  streamed side by side.
-- **chain** — `{ chain: [{agent, task}, …] }`: sequential, with a `{previous}`
-  placeholder that injects the prior step's output.
+The default is **non-blocking**: `agent` returns a `runId` immediately so the
+model is never parked. Six tools:
 
-Each run streams tool calls + text live, tracks usage (turns/tokens/cost),
-propagates Ctrl+C to kill the subprocess, and renders the final output as
-Markdown in the expanded (Ctrl+O) view. A registry file is callable as a
-subagent when it has both `agent:` and `description:` frontmatter; the callable
-name is the `agent:` value. See `subagent/agents.ts` for discovery.
+- `agent` — `{ agent, task, label?, wait?, timeoutMs? }` → launches, returns a
+  `runId`. Pass `wait:true` to block and render the result inline (tool calls +
+  Markdown + usage), for when you actually want the answer now.
+- `agent_status` — `{ runId }` → status / turn count / elapsed.
+- `agent_result` — `{ runId }` → final output (errors if still running).
+- `agent_wait` — `{ runId, timeoutMs? }` → blocks until done, streaming inline.
+- `agent_list` — all runs, newest first.
+- `agent_kill` — `{ runId }` → cancel a running run.
+
+**No dedicated parallel/chain mode** — the primitives compose:
+
+- **Parallel**: call `agent` several times in one turn to fan out, then
+  `agent_wait` (or `agent_result`) on each `runId`.
+- **Chain**: `agent … wait:true` (or `agent` → `agent_wait`) to get step A's
+  output, then call `agent` again with that output pasted into step B's task;
+  repeat for N steps, stopping early if a step's status isn't `done`.
+
+A registry file is callable when it has both `agent:` and `description:`
+frontmatter; the callable name is the `agent:` value, and an optional `model:`
+is passed through as `--model`. See `agent/agents.ts` for discovery.
+
+Human surface: **`/agent`** — `list` (default), `result <runId>`, `kill <runId>`.
+A live **below-editor widget** (`agent/widget.ts`) shows running agents
+(`⏳ scout 0:42`) and lingers finished ones ~10s, so you can fire agents and keep
+working without blocking.
+
+A lean port of playground's bg-agent stack: kept the fire-and-forget core,
+dropped the pieces that only fed the `/agents` panel and deep nesting
+(observability, model aliases, the subscription bus, the parent-linked run
+forest, MCP injection, detach-mid-flight). See `agent/runtime.ts`.
 
 ## readonly_bash
 

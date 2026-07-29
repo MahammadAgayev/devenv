@@ -6,18 +6,18 @@
  *
  *   name:   <id>
  *   prompt: <cmd>   → /<cmd> expands the body into the current conversation
- *   agent:  <name>  → callable subagent name (consumed by subagent/agents.ts)
- *   description:    → shown to the model when the file is a subagent
- *   tools:  a,b,c   → tool allowlist for the subagent flavor
- *   model:  <id>    → model override for the subagent flavor (optional)
+ *   agent:  <name>  → callable agent name (consumed by agent/agents.ts)
+ *   description:    → shown to the model when the file is an agent
+ *   tools:  a,b,c   → tool allowlist for the agent flavor
+ *   model:  <id>    → model override for the agent flavor (optional)
  *
  * This extension handles ONLY the prompt flavor (in-context expansion). The
- * agent flavor is served by the `subagent` tool (pi/extensions/subagent/),
+ * agent flavor is served by the `agent` tool family (pi/extensions/agent/),
  * which reads the same registry files.
  */
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { discover } from "./lib/agents/capabilities.ts";
+import { discover } from "./lib/capabilities.ts";
 
 export default function (pi: ExtensionAPI) {
   for (const cap of discover()) {

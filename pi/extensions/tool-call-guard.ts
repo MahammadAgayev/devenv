@@ -203,29 +203,9 @@ const REQUIRED_ARGS: Record<string, string[]> = {
   edit: ["path", "edits"],
   write: ["path", "content"],
   Agent: ["subagent_type", "prompt"],
-  bg_agent_run: ["agent", "task"],
+  agent: ["agent", "task"],
   Workflow: ["scriptPath"],
 };
-
-/**
- * The `subagent` tool accepts exactly one of three mode shapes: single
- * ({ agent, task }), parallel ({ tasks: [...] }), or chain ({ chain: [...] }).
- * A fixed required-arg list can't express "one of", so it's checked separately.
- */
-export function checkSubagentArgs(args: Record<string, unknown> | undefined): string | null {
-  if (!args || typeof args !== "object" || Array.isArray(args)) {
-    return `BLOCKED: tool "subagent" called with no arguments. Provide one mode: { agent, task }, { tasks: [...] }, or { chain: [...] }.`;
-  }
-  const hasSingle =
-    typeof args.agent === "string" && args.agent.trim() !== "" &&
-    typeof args.task === "string" && args.task.trim() !== "";
-  const hasParallel = Array.isArray(args.tasks) && args.tasks.length > 0;
-  const hasChain = Array.isArray(args.chain) && args.chain.length > 0;
-  if (Number(hasSingle) + Number(hasParallel) + Number(hasChain) === 0) {
-    return `BLOCKED: tool "subagent" needs exactly one mode: { agent, task }, { tasks: [...] }, or { chain: [...] }.`;
-  }
-  return null;
-}
 
 /**
  * Check whether a tool call has a required argument that is empty, missing, or
@@ -262,10 +242,6 @@ export default function (pi: ExtensionAPI): void {
     const cwd = ctx.cwd;
 
     // 0. Empty required arguments — block before any tool-specific checks.
-    if (event.toolName === "subagent") {
-      const reason = checkSubagentArgs(event.input as Record<string, unknown> | undefined);
-      if (reason) return { block: true, reason };
-    }
     const emptyReason = checkEmptyRequiredArgs(event.toolName, event.input as Record<string, unknown> | undefined);
     if (emptyReason) return { block: true, reason: emptyReason };
 
