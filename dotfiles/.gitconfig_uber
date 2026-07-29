@@ -26,4 +26,4 @@
 [gpg "x509"]
    program = /opt/uber/bin/signingfx
 [commit]
-   gpgsign = false
+   gpgsign = true
