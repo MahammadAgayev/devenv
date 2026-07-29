@@ -15,7 +15,7 @@
  * is a callable agent when it has both `agent:` and `description:` frontmatter.
  *
  * Storage layout — <stateRoot>/pi-bg-runs/<runId>/
- *   meta.json     immutable launch metadata { agent, label, started }
+ *   meta.json     immutable launch metadata { agent, label, task, cwd, started }
  *   status        "running" | "done" | "failed" | "aborted"  (mutable; polled)
  *   turns         approximate assistant-turn count
  *   result        final assistant text (written on finish)
@@ -40,6 +40,8 @@ export type RunStatus = "running" | "done" | "failed" | "aborted";
 export interface RunMeta {
 	agent: string;
 	label: string;
+	task: string;
+	cwd: string;
 	started: number;
 }
 
@@ -48,6 +50,8 @@ export interface RunSummary {
 	status: RunStatus;
 	agent: string;
 	label: string;
+	task: string;
+	cwd: string;
 	started: number;
 	mtimeMs: number;
 }
@@ -291,7 +295,7 @@ export function launchRun(agentName: string, task: string, label: string, cwd: s
 	const agents = discoverAgents();
 	const agent = agents.find((a) => a.name === agentName);
 	const started = Date.now();
-	writeMeta(runId, { agent: agentName, label, started });
+	writeMeta(runId, { agent: agentName, label, task, cwd, started });
 
 	if (!agent) {
 		const available = agents.map((a) => a.name).join(", ") || "none";
@@ -414,6 +418,8 @@ export function listRuns(): RunSummary[] {
 			status,
 			agent: meta.agent ?? "?",
 			label: meta.label ?? id,
+			task: meta.task ?? "",
+			cwd: meta.cwd ?? "",
 			started: meta.started ?? 0,
 			mtimeMs,
 		};

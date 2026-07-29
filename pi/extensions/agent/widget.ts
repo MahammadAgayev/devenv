@@ -14,12 +14,16 @@
  */
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import * as path from "node:path";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { listRuns, reapOldRuns, RETENTION_MS, type RunStatus } from "./runtime.ts";
 
 const WIDGET_KEY = "bg-agents";
 const POLL_MS = 1000;
 // How long a finished run keeps showing (as ✓/✗) before it drops off the widget.
 const LINGER_MS = 10_000;
+// Task preview length on the second line.
+const TASK_PREVIEW = 56;
 
 function icon(status: RunStatus): string {
 	switch (status) {
@@ -38,8 +42,8 @@ function fmtClock(ms: number): string {
 	return `${m}:${String(s % 60).padStart(2, "0")}`;
 }
 
-function truncLabel(s: string, width: number): string {
-	return s.length <= width ? s.padEnd(width) : s.slice(0, width - 1) + "…";
+function trunc(s: string, width: number): string {
+	return s.length <= width ? s : s.slice(0, width - 1) + "…";
 }
 
 export function registerBgAgentWidget(pi: ExtensionAPI) {
@@ -64,13 +68,19 @@ export function registerBgAgentWidget(pi: ExtensionAPI) {
 
 		const render = () => {
 			const now = Date.now();
+			// Two lines per run (A+B): a dense status line, then a dimmed task line.
+			//   ⏳ reviewer · devenv · 0:42
+			//      ↳ Review the agent-consolidation refactor…
 			// Show every running run, plus finished ones that ended within LINGER_MS.
-			const rows = listRuns()
-				.filter((r) => r.status === "running" || now - r.mtimeMs < LINGER_MS)
-				.map((r) => {
-					const age = r.status === "running" ? fmtClock(now - r.started) : r.status;
-					return `${icon(r.status)} ${truncLabel(r.label, 12)} ${age}`;
-				});
+			const rows: string[] = [];
+			for (const r of listRuns()) {
+				if (r.status !== "running" && now - r.mtimeMs >= LINGER_MS) continue;
+				const when = r.status === "running" ? fmtClock(now - r.started) : r.status;
+				const folder = r.cwd ? path.basename(r.cwd) : "";
+				const head = [r.agent, folder, when].filter(Boolean).join(" · ");
+				rows.push(`${icon(r.status)} ${head}`);
+				if (r.task) rows.push(`   ↳ ${trunc(r.task, TASK_PREVIEW)}`);
+			}
 
 			if (rows.length === 0) {
 				if (shownLastTick) {

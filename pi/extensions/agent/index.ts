@@ -32,6 +32,7 @@ import type { Message } from "@earendil-works/pi-ai";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Text } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
+import * as path from "node:path";
 import { getFinalOutput, renderAgentRun, type UsageStats } from "./render.ts";
 import {
 	getRunResult,
@@ -63,6 +64,12 @@ function fmtElapsed(ms: number): string {
 	if (s < 60) return `${s}s`;
 	const m = Math.floor(s / 60);
 	return `${m}m${String(s % 60).padStart(2, "0")}s`;
+}
+
+/** One line for `agent_list` / `/agent list`: id, status, agent, folder, label. */
+function fmtRunLine(r: { runId: string; status: string; agent: string; label: string; cwd: string }): string {
+	const folder = r.cwd ? path.basename(r.cwd) : "?";
+	return `${r.runId}  ${r.status.padEnd(8)}  ${r.agent}  ${folder}  "${r.label}"`;
 }
 
 /** Shared wait+stream+render used by both `agent` (wait:true) and `agent_wait`. */
@@ -287,9 +294,7 @@ export default function (pi: ExtensionAPI) {
 			const text =
 				runs.length === 0
 					? "No agent runs found."
-					: runs
-							.map((r) => `${r.runId}  ${r.status.padEnd(8)}  ${r.agent}  "${r.label}"`)
-							.join("\n");
+					: runs.map(fmtRunLine).join("\n");
 			return { content: [{ type: "text", text }], details: { runs, total: runs.length } };
 		},
 		renderCall(_args, theme) {
@@ -364,9 +369,7 @@ export default function (pi: ExtensionAPI) {
 						ctx.ui.notify("No agent runs.", "info");
 						return;
 					}
-					const lines = runs.map(
-						(r) => `${r.runId}  ${r.status.padEnd(8)}  ${r.agent}  "${r.label}"`,
-					);
+					const lines = runs.map(fmtRunLine);
 					ctx.ui.notify(lines.join("\n"), "info");
 					return;
 				}
