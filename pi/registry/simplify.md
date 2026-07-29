@@ -2,6 +2,7 @@
 name: simplify
 prompt: simplify
 agent: simplifier
+description: Simplifies code while preserving behavior exactly (dead code, redundant abstractions, duplication)
 tools: read,grep,find,ls,readonly_bash
 ---
 

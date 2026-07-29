@@ -1,8 +1,8 @@
 /**
  * capabilities.ts — discover the capability registry (pi/registry/*.md).
  *
- * Shared by registry.ts (prompt/agent tools) and job-manager.ts (background
- * jobs) so both read the same single source of truth.
+ * Used by registry.ts to expose each file's `prompt:` flavor as an in-context
+ * /<cmd>. The subagent tool reads the same files via subagent/agents.ts.
  */
 
 import * as fs from "node:fs";
@@ -17,23 +17,6 @@ export interface Capability {
   tools?: string[];
   model?: string;
   body: string;
-}
-
-export interface AgentBrief {
-  goal: string;
-  task: string;
-  context?: string;
-  critical_files?: string[];
-  open_questions?: string[];
-}
-
-/** Assemble a structured brief into the markdown task a sub-agent receives. */
-export function formatBrief(b: AgentBrief): string {
-  const parts = [`# Goal\n${b.goal.trim()}`, `# Task\n${b.task.trim()}`];
-  if (b.context?.trim()) parts.push(`# Context\n${b.context.trim()}`);
-  if (b.critical_files?.length) parts.push(`# Critical files\n${b.critical_files.map((f) => `- ${f}`).join("\n")}`);
-  if (b.open_questions?.length) parts.push(`# Open questions\n${b.open_questions.map((q) => `- ${q}`).join("\n")}`);
-  return parts.join("\n\n");
 }
 
 /**
@@ -71,10 +54,4 @@ export function discover(): Capability[] {
     });
   }
   return caps;
-}
-
-/** Find a capability that exposes an agent flavor, by capability name or agent name. */
-export function findAgentCapability(query: string): Capability | undefined {
-  const q = query.trim().toLowerCase();
-  return discover().find((c) => c.agent && (c.name.toLowerCase() === q || c.agent.toLowerCase() === q));
 }

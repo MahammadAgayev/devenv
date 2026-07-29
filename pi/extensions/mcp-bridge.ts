@@ -641,6 +641,28 @@ function registerFromCache(
   return count;
 }
 
+// Register the `mcp` proxy tool. Single source of truth so all call sites
+// (cache hit, cache miss, /mcp-refresh) register identical config.
+function registerMcpProxy(
+  pi: ExtensionAPI,
+  registered: Set<string>,
+  serverCache: Map<string, McpTool[]>,
+  config: Required<McpLocalConfig>,
+): void {
+  if (config.disableProxyTool) return;
+  pi.registerTool({
+    name: "mcp",
+    label: "MCP",
+    description: "Proxy for all MCP servers. Use mcp({ search, describe, call, connect, status, list }) to discover and invoke MCP tools without registering them all in context.",
+    promptSnippet: "Proxy for all MCP servers — discover and call any tool via mcp({ action, tool, args })",
+    promptGuidelines: [
+      "Use mcp({ action: \"search\", search: \"keywords\" }) to discover MCP tools, then mcp({ action: \"call\", tool: \"mcp__server__tool\", args: \"{}\" }) to invoke them.",
+    ],
+    parameters: MCP_PROXY_SCHEMA,
+    execute: proxyToolExecute(pi, registered, serverCache, config),
+  });
+}
+
 // ─── extension ───────────────────────────────────────────────────────────────
 
 export default function mcpBridgeExtension(pi: ExtensionAPI) {
@@ -677,15 +699,7 @@ export default function mcpBridgeExtension(pi: ExtensionAPI) {
       }
 
       // Always register proxy unless explicitly disabled
-      if (!config.disableProxyTool) {
-        pi.registerTool({
-          name: "mcp",
-          label: "MCP",
-          description: "Proxy for all MCP servers. Use mcp({ search, describe, call, connect, status, list }) to discover and invoke MCP tools without registering them all in context.",
-          parameters: MCP_PROXY_SCHEMA,
-          execute: proxyToolExecute(pi, registered, serverCache, config),
-        });
-      }
+      registerMcpProxy(pi, registered, serverCache, config);
 
       const ok = serverNames.length - unavailable.length;
       const parts = [`mcp-bridge: ${totalTools} direct tools from ${ok}/${serverNames.length} servers (cache hit)`];
@@ -718,19 +732,7 @@ export default function mcpBridgeExtension(pi: ExtensionAPI) {
 
     writeCache(newCache);
 
-    if (!config.disableProxyTool) {
-      pi.registerTool({
-        name: "mcp",
-        label: "MCP",
-        description: "Proxy for all MCP servers. Use mcp({ search, describe, call, connect, status, list }) to discover and invoke MCP tools without registering them all in context.",
-        promptSnippet: "Proxy for all MCP servers — discover and call any tool via mcp({ action, tool, args })",
-        promptGuidelines: [
-          "Use mcp({ action: \"search\", search: \"keywords\" }) to discover MCP tools, then mcp({ action: \"call\", tool: \"mcp__server__tool\", args: \"{}\" }) to invoke them.",
-        ],
-        parameters: MCP_PROXY_SCHEMA,
-        execute: proxyToolExecute(pi, registered, serverCache, config),
-      });
-    }
+    registerMcpProxy(pi, registered, serverCache, config);
 
     const ok = serverNames.length - failed.length;
     const parts = [`mcp-bridge: ${totalTools} direct tools from ${ok}/${serverNames.length} servers`];
@@ -812,15 +814,7 @@ export default function mcpBridgeExtension(pi: ExtensionAPI) {
 
       writeCache(newCache);
 
-      if (!config.disableProxyTool) {
-        pi.registerTool({
-          name: "mcp",
-          label: "MCP",
-          description: "Proxy for all MCP servers. Use mcp({ search, describe, call, connect, status, list }) to discover and invoke MCP tools without registering them all in context.",
-          parameters: MCP_PROXY_SCHEMA,
-          execute: proxyToolExecute(pi, registered, serverCache, config),
-        });
-      }
+      registerMcpProxy(pi, registered, serverCache, config);
 
       const parts = [`mcp-bridge: ${newTools} direct tools registered (${registered.size} total)`];
       if (failed.length > 0) parts.push(`(unavailable: ${failed.join(", ")})`);

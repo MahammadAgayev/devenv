@@ -2,6 +2,7 @@
 name: review
 prompt: review
 agent: reviewer
+description: Code review specialist for quality, security, and maintainability analysis
 tools: read,grep,find,ls,readonly_bash
 ---
 

@@ -17,10 +17,12 @@
  */
 
 import type { AgentToolResult, ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { type AutocompleteItem, fuzzyFilter } from "@earendil-works/pi-tui";
 import { execFile, execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
+import { tmpdir } from "node:os";
 import { PATHS } from "./lib/paths.ts";
 import { Type } from "typebox";
 
@@ -686,7 +688,7 @@ export default function skillDiscovery(pi: ExtensionAPI) {
       // Also report workspace skills from the cache (if available)
       const wsCache = readWorkspaceSkillCache(process.cwd());
       const wsCount = wsCache?.skills.length ?? 0;
-      const wsSuffix = wsCount > 0 ? ` + ${wsCount} workspace skills from ${process.cwd}` : "";
+      const wsSuffix = wsCount > 0 ? ` + ${wsCount} workspace skills from ${process.cwd()}` : "";
 
       if (SKILLS_MODE === "full") {
         const skipped = resolvedSkills.skippedCollisions
@@ -705,6 +707,88 @@ export default function skillDiscovery(pi: ExtensionAPI) {
           "info",
         );
       }
+    },
+  });
+
+  // /skill-load — human-facing loader. Type-to-search: getArgumentCompletions
+  // fuzzy-filters skill names as you type the argument. An exact name loads
+  // directly; otherwise a filtered picker is shown. The chosen skill's
+  // invocation directive (Workflow/Agent/inline) is sent as a user message.
+  pi.registerCommand("skill-load", {
+    description: "Browse and load a specific skill: /skill-load [name|filter]",
+    getArgumentCompletions: (prefix): AutocompleteItem[] | null => {
+      // Show nothing until the user types — a full dump buries the input line.
+      const query = prefix.trim();
+      if (!query) return null;
+      const infos = [...buildSkillIndex(repoRoot).values()];
+      const items = fuzzyFilter(infos, query, info => info.name)
+        .slice(0, 8)
+        .map(info => ({
+          value: info.name,
+          label: info.name,
+          description: `[${info.source}] ${info.description}`,
+        }));
+      return items.length > 0 ? items : null;
+    },
+    handler: async (args, ctx) => {
+      const query = (args?.trim() ?? "");
+      const index = buildSkillIndex(repoRoot);
+
+      // Exact name (from autocomplete) → load directly, no picker.
+      let picked: SkillInfo | undefined = index.get(query) ?? index.get(query.toLowerCase());
+
+      if (!picked) {
+        const filter = query.toLowerCase();
+        const infos = [...index.values()]
+          .filter(info =>
+            !filter ||
+            info.name.toLowerCase().includes(filter) ||
+            info.description.toLowerCase().includes(filter),
+          )
+          .sort((a, b) => a.name.localeCompare(b.name));
+
+        if (infos.length === 0) {
+          ctx.ui.notify(
+            filter ? `No skills matching '${filter}'.` : "No skills discovered. Run marketplace setup, then /reload.",
+            "info",
+          );
+          return;
+        }
+
+        // fzf in a tmux popup — same picker feel as ctrl+f (tmux-sessionizer).
+        // display-popup can't return stdout, so fzf writes the picked line's
+        // skill name (column 1) to an output temp file we read back. Column 3
+        // holds the SKILL.md path (hidden via --with-nth) for the preview pane.
+        const nonce = createHash("sha1").update(String(Date.now() + Math.random())).digest("hex").slice(0, 12);
+        const inPath = join(tmpdir(), `pi-skill-load-${nonce}.in`);
+        const outPath = join(tmpdir(), `pi-skill-load-${nonce}.out`);
+        const table = infos
+          .map(info => `${info.name}\t${info.name}  [${info.source}]\t${join(info.dir, "SKILL.md")}`)
+          .join("\n");
+        writeFileSync(inPath, table);
+
+        const fzfCmd =
+          `fzf --delimiter='\t' --with-nth=2 --prompt='> ' ` +
+          `--height=100% --reverse --tiebreak=index ${filter ? `--query='${filter}' ` : ""}` +
+          `--preview='cat {3} 2>/dev/null' --preview-window='right,60%,wrap' ` +
+          `< '${inPath}' | cut -f1 > '${outPath}'`;
+        try {
+          await pi.exec("tmux", ["display-popup", "-E", "-w", "80%", "-h", "80%", "bash", "-c", fzfCmd]);
+          const selectedName = existsSync(outPath) ? readFileSync(outPath, "utf8").trim() : "";
+          if (!selectedName) return;
+          picked = infos.find(info => info.name === selectedName);
+        } finally {
+          for (const p of [inPath, outPath]) {
+            if (existsSync(p)) unlinkSync(p);
+          }
+        }
+      }
+      if (!picked) return;
+
+      const result = formatSkillResponse(picked);
+      const text = result.content.map(c => (c.type === "text" ? c.text : "")).join("\n").trim();
+      ctx.ui.notify(`Loading skill '${picked.name}'…`, "info");
+      await pi.sendUserMessage(text);
     },
   });
 }
