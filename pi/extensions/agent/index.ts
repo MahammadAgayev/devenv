@@ -34,6 +34,7 @@ import { Text } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
 import * as path from "node:path";
 import { getFinalOutput, renderAgentRun, type UsageStats } from "./render.ts";
+import { discoverAgents } from "./agents.ts";
 import {
 	getRunResult,
 	getRunStatus,
@@ -58,6 +59,10 @@ interface WaitDetails {
 }
 
 const DEFAULT_WAIT_MS = 300_000;
+// Background commands wait for their run just above the runtime's 30m TIMEOUT_MS
+// so the runtime's own abort always lands first and we capture the final result
+// instead of racing to a "(no output)" report.
+const BG_WAIT_MS = 31 * 60 * 1000;
 
 function fmtElapsed(ms: number): string {
 	const s = Math.round(ms / 1000);
@@ -393,4 +398,39 @@ export default function (pi: ExtensionAPI) {
 			}
 		},
 	});
+
+	// ── per-agent background commands ────────────────────────────────────────────
+	// Every registry agent gets a fire-and-forget command named after it (e.g.
+	// /reviewer, /simplifier). It launches the agent in the background — never
+	// blocking the editor — and posts the agent's output into the main UI when done.
+	// The below-editor widget shows progress while it works. This is the
+	// counterpart to registry.ts's prompt commands (which expand in-context).
+	for (const agent of discoverAgents()) {
+		pi.registerCommand(agent.name, {
+			description: `${agent.description} (background)`,
+			handler: async (args, ctx) => {
+				const scope = (args ?? "").trim();
+				const task = scope ? `Scope: ${scope}` : "Work on the working diff.";
+				const runId = launchRun(agent.name, task, agent.name, ctx.cwd);
+				// launchRun fails synchronously for an unknown agent — surface that now.
+				if (readStatus(runId) === "failed") {
+					ctx.ui.notify(getRunResult(runId) ?? `Failed to launch agent "${agent.name}".`, "error");
+					return;
+				}
+				ctx.ui.notify(`${agent.name} started in the background…`, "info");
+
+				// Fire-and-forget: wait off the command turn so the editor stays free.
+				void (async () => {
+					try {
+						await waitForRun(runId, BG_WAIT_MS);
+						const output = getRunResult(runId) ?? "(no output)";
+						const report = `## ${agent.name} results\n\n${output}`;
+						pi.sendMessage({ customType: "agent-result", content: report, display: true }, { triggerTurn: false });
+					} catch (err) {
+						ctx.ui.notify(`${agent.name} failed: ${err instanceof Error ? err.message : String(err)}`, "error");
+					}
+				})();
+			},
+		});
+	}
 }
