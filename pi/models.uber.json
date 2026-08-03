@@ -6,8 +6,8 @@
       "apiKey": "!usso -ussh genai-api.uberinternal.com -print",
       "models": [
         {
-          "id": "claude-opus-4-8-thinking",
-          "contextWindow": 200000,
+          "id": "claude-opus-5-thinking",
+          "contextWindow": 400000,
           "maxTokens": 32000,
           "reasoning": true,
           "thinkingLevelMap": {
@@ -16,6 +16,28 @@
           "compat": {
             "supportsDeveloperRole": false,
             "supportsReasoningEffort": false
+          }
+        },
+        {
+          "id": "claude-sonnet-5-thinking",
+          "contextWindow": 400000,
+          "maxTokens": 32000,
+          "reasoning": true,
+          "thinkingLevelMap": {
+            "off": null
+          },
+          "compat": {
+            "supportsDeveloperRole": false,
+            "supportsReasoningEffort": false
+          }
+        },
+        {
+          "id": "gpt-56-sol",
+          "contextWindow": 400000,
+          "maxTokens": 32000,
+          "reasoning": true,
+          "compat": {
+            "supportsDeveloperRole": false
           }
         }
       ]
