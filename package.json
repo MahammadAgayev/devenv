@@ -1,11 +1,12 @@
 {
   "name": "mahammad-devenv-pi",
   "version": "0.1.0",
-  "description": "Mahammad's pi coding-agent config: capability registry, background agents, read-only bash, and themes.",
+  "description": "Mahammad's pi coding-agent config: extensions, prompt templates, skills, and themes.",
   "keywords": ["pi-package"],
   "private": true,
   "pi": {
     "extensions": ["pi/extensions"],
+    "prompts": ["pi/prompts"],
     "skills": ["pi/skills"],
     "themes": ["pi/themes"]
   },

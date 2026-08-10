@@ -36,15 +36,6 @@ export const PATHS = {
   get devenvRoot(): string {
     return getDevenvRoot();
   },
-  /** The `pi/` config dir shipping these extensions (extensions/, registry/, themes/). */
-  get piConfigDir(): string {
-    return process.env.PI_CONFIG_DIR ?? join(this.devenvRoot, "pi");
-  },
-  /** Capability registry files (`pi/registry/*.md`). `PI_REGISTRY_DIR` overrides. */
-  get registryDir(): string {
-    return process.env.PI_REGISTRY_DIR ?? join(this.piConfigDir, "registry");
-  },
-
   // ── Roots ────────────────────────────────────────────────────────────────
   get stateRoot(): string {
     return process.env.STATE_ROOT ?? join(getHome(), ".local");

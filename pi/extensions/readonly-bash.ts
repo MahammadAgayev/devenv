@@ -2,11 +2,7 @@
  * readonly-bash.ts — a bash tool that only runs read-only / non-destructive
  * commands, gated by the same `isSafeCommand` allowlist used by plan mode.
  *
- * Safe to expose everywhere (main session + spawned registry agents): it is
- * strictly a subset of `bash`. Agents that need shell access should list
- * `readonly_bash` instead of `bash`.
- *
- * TODO(later): refactor plan-mode's bash gating to route through this tool.
+ * Strictly a subset of `bash` — only non-destructive commands pass the gate.
  */
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
