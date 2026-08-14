@@ -12,7 +12,7 @@
   "packages": [
     "~/devenv",
     "https://github.com/carderne/pi-nvim",
-    "npm:pi-nvim"
+    "https://github.com/MahammadAgayev/chorus.pi"
   ],
   "lastChangelogVersion": "0.80.3",
   "theme": "rose-pine-moon"
