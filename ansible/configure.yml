@@ -214,6 +214,19 @@
         state: link
         force: true
 
+    - name: Ensure ~/.pi/agent/chorus exists
+      file:
+        path: "{{ home }}/.pi/agent/chorus"
+        state: directory
+        mode: '0755'
+
+    - name: Symlink chorus agents directory
+      file:
+        src: "{{ devenv }}/pi/chorus/agents"
+        dest: "{{ home }}/.pi/agent/chorus/agents"
+        state: link
+        force: true
+
     - name: Install devenv post-merge hook
       file:
         src: "{{ devenv }}/git-hooks/devenv-post-merge"
