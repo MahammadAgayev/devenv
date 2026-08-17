@@ -52,6 +52,28 @@
           "compat": {
             "supportsDeveloperRole": false
           }
+        },
+        {
+          "id": "claude-fable-5",
+          "contextWindow": 400000,
+          "maxTokens": 32000,
+          "reasoning": true,
+          "thinkingLevelMap": {
+            "off": null
+          },
+          "compat": {
+            "supportsDeveloperRole": false,
+            "supportsReasoningEffort": false
+          }
+        },
+        {
+          "id": "gpt-56-terra",
+          "contextWindow": 400000,
+          "maxTokens": 32000,
+          "reasoning": true,
+          "compat": {
+            "supportsDeveloperRole": false
+          }
         }
       ]
     }
