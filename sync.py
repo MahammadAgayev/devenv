@@ -36,44 +36,25 @@ def get_profile():
     return config["profile"]
 
 
-def get_workspace():
-    config = load_config()
-    if "workspace" not in config:
-        print("No workspace configured. Choose one:")
-        print("  1) local (default)")
-        print("  2) go-devpod")
-        choice = input("Enter 1 or 2: ").strip()
-        workspace = "go-devpod" if choice == "2" else "local"
-        config["workspace"] = workspace
-        save_config(config)
-        print(f"Saved workspace: {workspace}")
-    return config["workspace"]
-
-
-def run_playbook(playbook, profile, workspace):
-    cmd = ["ansible-playbook", os.path.join(DEVENV_DIR, "ansible", playbook), "-e", f"profile={profile}", "-e", f"workspace={workspace}"]
+def run_playbook(playbook, profile):
+    cmd = ["ansible-playbook", os.path.join(DEVENV_DIR, "ansible", playbook), "-e", f"profile={profile}"]
     return subprocess.run(cmd).returncode
 
 
 def cmd_sync(args):
-    profile = get_profile()
-    workspace = get_workspace()
-    return run_playbook("configure.yml", profile, workspace)
+    return run_playbook("configure.yml", get_profile())
 
 
 def cmd_install(args):
-    profile = get_profile()
-    workspace = get_workspace()
-    return run_playbook("install.yml", profile, workspace)
+    return run_playbook("install.yml", get_profile())
 
 
 def cmd_all(args):
     profile = get_profile()
-    workspace = get_workspace()
-    rc = run_playbook("configure.yml", profile, workspace)
+    rc = run_playbook("configure.yml", profile)
     if rc != 0:
         return rc
-    return run_playbook("install.yml", profile, workspace)
+    return run_playbook("install.yml", profile)
 
 
 def cmd_config(args):
@@ -82,10 +63,6 @@ def cmd_config(args):
         config["profile"] = args.profile
         save_config(config)
         print(f"Profile set to: {args.profile}")
-    elif args.workspace:
-        config["workspace"] = args.workspace
-        save_config(config)
-        print(f"Workspace set to: {args.workspace}")
     else:
         print(json.dumps(config, indent=2))
     return 0
@@ -101,7 +78,6 @@ def main():
 
     config_parser = subparsers.add_parser("config", help="Show/set config")
     config_parser.add_argument("--profile", choices=["uber", "personal"], help="Set profile")
-    config_parser.add_argument("--workspace", choices=["local", "go-devpod"], help="Set workspace")
 
     args = parser.parse_args()
 

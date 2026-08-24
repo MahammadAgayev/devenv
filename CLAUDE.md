@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What This Repo Is
 
-Personal development environment manager using Ansible. Manages dotfiles, Neovim config, Claude Code settings, and shell tooling across two profiles (`uber` and `personal`) and two workspaces (`local` and `go-devpod`).
+Personal development environment manager using Ansible. Manages dotfiles, Neovim config, Claude Code settings, and shell tooling across two profiles (`uber` and `personal`).
 
 ## Key Commands
 
@@ -18,13 +18,13 @@ python3 sync.py install
 # Both
 python3 sync.py all
 
-# View or change profile/workspace
+# View or change profile
 python3 sync.py config
-python3 sync.py config --profile uber --workspace local
+python3 sync.py config --profile uber
 
 # Direct Ansible (runs from ansible/ dir)
 ansible-playbook ansible/configure.yml
-ansible-playbook ansible/configure.yml -e profile=personal -e workspace=go-devpod
+ansible-playbook ansible/configure.yml -e profile=personal
 ansible-playbook ansible/install.yml
 ansible-playbook ansible/cleanup.yml
 
@@ -35,14 +35,15 @@ python3 remote.py sync --all         # clone + full install on remote
 python3 remote.py add <name> <host>
 ```
 
-Profile and workspace are stored in `~/.devenv.json`. Ansible variables `profile` and `workspace` control which tasks run.
+Profile is stored in `~/.devenv.json`. The Ansible variable `profile` controls which tasks run. Machine-specific behaviour (which monorepo is present) is autodetected rather than configured.
 
 ## Architecture
 
-### Profiles & Workspaces
+### Profiles
 
 - **Profile** (`uber` | `personal`): Controls which Claude settings file is symlinked, whether Uber-specific tools (bazel, MCP, go-code envrc) are configured.
-- **Workspace** (`local` | `go-devpod`): Controls whether go-devpod-specific configs (`.envrc.local`, `ulsp.sh`) are deployed.
+
+There is no workspace setting. Per-machine differences are autodetected: the go-code `.envrc.local` is only linked when `~/go-code` exists, and `scripts/ulsp.sh` picks whichever monorepo checkout it finds.
 
 ### How Symlinks Work
 

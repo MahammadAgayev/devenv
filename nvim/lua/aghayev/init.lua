@@ -1,6 +1,7 @@
 require("aghayev.set")
 require("aghayev.remap")
 require("aghayev.lazy_init")
+require("aghayev.java")
 
 local augroup = vim.api.nvim_create_augroup
 local aghayevGroup = augroup('aghayev', {})
@@ -63,6 +64,13 @@ autocmd('LspAttach', {
         vim.keymap.set("i", "<C-h>", function() vim.lsp.buf.signature_help() end, opts)
         vim.keymap.set("n", "[d", function() vim.diagnostic.goto_prev() end, opts)
         vim.keymap.set("n", "]d", function() vim.diagnostic.goto_next() end, opts)
+
+        if vim.bo[e.buf].filetype == "java" then
+            local java = require("aghayev.java")
+            vim.keymap.set("n", "<leader>js", java.sync_file, opts)
+            vim.keymap.set("n", "<leader>ji", java.index_target, opts)
+            vim.keymap.set("n", "<leader>ja", java.sync_all, opts)
+        end
     end
 })
 

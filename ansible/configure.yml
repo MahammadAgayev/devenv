@@ -4,7 +4,6 @@
     home: "{{ lookup('env', 'HOME') }}"
     devenv: "{{ playbook_dir | dirname }}"
     profile: "{{ profile | default('uber') }}"
-    workspace: "{{ workspace | default('local') }}"
 
   tasks:
     - name: Symlink dotfiles
@@ -135,29 +134,37 @@
         force: true
         mode: '0755'
 
-    - name: Symlink go-code envrc (uber + go-devpod only)
+    # Deployed only where a go-code checkout actually exists, rather than being
+    # gated on a hand-maintained workspace setting.
+    - name: Check for go-code checkout
+      stat: { path: "{{ home }}/go-code" }
+      register: go_code
+
+    - name: Symlink go-code envrc (uber only, if go-code exists)
       file:
         src: "{{ devenv }}/dotfiles/.gomonorepo.envrc.local"
         dest: "{{ home }}/go-code/.envrc.local"
         state: link
         force: true
-      when: profile == 'uber' and workspace == 'go-devpod'
+      when: profile == 'uber' and go_code.stat.exists
 
-    - name: Ensure ~/ulsp exists (uber + go-devpod only)
+    # ulsp.sh autodetects the monorepo (go-code/fievel), so it is deployed for
+    # any uber machine.
+    - name: Ensure ~/ulsp exists (uber only)
       file:
         path: "{{ home }}/ulsp"
         state: directory
         mode: '0755'
-      when: profile == 'uber' and workspace == 'go-devpod'
+      when: profile == 'uber'
 
-    - name: Symlink ulsp.sh (uber + go-devpod only)
+    - name: Symlink ulsp.sh (uber only)
       file:
         src: "{{ devenv }}/scripts/ulsp.sh"
         dest: "{{ home }}/ulsp/ulsp.sh"
         state: link
         force: true
         mode: '0755'
-      when: profile == 'uber' and workspace == 'go-devpod'
+      when: profile == 'uber'
 
     - name: Ensure ~/.pi/agent exists
       file:
