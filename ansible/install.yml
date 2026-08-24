@@ -4,6 +4,12 @@
     home: "{{ lookup('env', 'HOME') }}"
     zsh_custom: "{{ lookup('env', 'ZSH_CUSTOM') | default(home + '/.oh-my-zsh/custom', true) }}"
 
+  # Shell tasks run non-interactively, so ~/.zshrc is never sourced and
+  # ~/.cargo/bin is absent from PATH. nvim-treesitter shells out to the
+  # tree-sitter CLI (cargo-installed below) to compile parsers.
+  environment:
+    PATH: "{{ home }}/.cargo/bin:{{ home }}/.bun/bin:{{ home }}/.local/bin:{{ ansible_env.PATH }}"
+
   tasks:
     - name: Install packages (macOS)
       community.general.homebrew:
