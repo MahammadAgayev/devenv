@@ -116,13 +116,109 @@ function M.sync_all()
 end
 
 -- =========================================================================
+-- Eclipse project generation (for JDTLS build path)
+-- =========================================================================
+
+-- Discover src/*/java source roots under a bazel package.
+local function find_source_dirs(pkg_dir)
+    local dirs = {}
+    local hits = vim.fn.glob(pkg_dir .. "/src/*/java", false, true)
+    for _, d in ipairs(hits) do
+        table.insert(dirs, d:sub(#pkg_dir + 2))
+    end
+    if #dirs == 0 then
+        if vim.fn.isdirectory(pkg_dir .. "/src") == 1 then
+            table.insert(dirs, "src")
+        end
+    end
+    return dirs
+end
+
+local function write_dot_project(pkg_dir, name)
+    local lines = {
+        '<?xml version="1.0" encoding="UTF-8"?>',
+        "<projectDescription>",
+        "  <name>" .. name .. "</name>",
+        "  <buildSpec>",
+        "    <buildCommand>",
+        "      <name>org.eclipse.jdt.core.javabuilder</name>",
+        "    </buildCommand>",
+        "  </buildSpec>",
+        "  <natures>",
+        "    <nature>org.eclipse.jdt.core.javanature</nature>",
+        "  </natures>",
+        "</projectDescription>",
+    }
+    vim.fn.writefile(lines, pkg_dir .. "/.project")
+end
+
+local function write_dot_classpath(pkg_dir, source_dirs, lib_jars, jdk_name)
+    local lines = { '<?xml version="1.0" encoding="UTF-8"?>', "<classpath>" }
+    for _, src in ipairs(source_dirs) do
+        table.insert(lines, '  <classpathentry kind="src" path="' .. src .. '"/>')
+    end
+    table.insert(lines, '  <classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER/'
+        .. "org.eclipse.jdt.internal.debug.ui.launcher.StandardVMType/" .. jdk_name .. '"/>')
+    for _, jar in ipairs(lib_jars) do
+        table.insert(lines, '  <classpathentry kind="lib" path="' .. jar .. '"/>')
+    end
+    table.insert(lines, '  <classpathentry kind="output" path="bin"/>')
+    table.insert(lines, "</classpath>")
+    vim.fn.writefile(lines, pkg_dir .. "/.classpath")
+end
+
+-- Fetch compile classpath jars from bazel cquery (async).
+local function fetch_classpath_async(monorepo, pkg_dir, on_done)
+    local rel = vim.fs.relpath(monorepo, pkg_dir)
+    if not rel then return end
+    local pkg = "//" .. rel
+
+    local query = ('kind("java_library|java_test", %s:all)'):format(pkg)
+    vim.system({ "./tools/bazel", "query", query }, { cwd = monorepo, text = true }, function(qres)
+        local targets = {}
+        for line in (qres.stdout or ""):gmatch("[^\n]+") do
+            local t = vim.trim(line)
+            if t ~= "" then table.insert(targets, t) end
+        end
+        if #targets == 0 then
+            vim.schedule(function() on_done({}) end)
+            return
+        end
+
+        local target_union = table.concat(targets, " + ")
+        local expr = '"\\n".join([f.path for f in providers(target)'
+            .. '["@@rules_java+//java/private:java_info.bzl%JavaInfo"]'
+            .. ".transitive_compile_time_jars.to_list()])"
+        vim.system(
+            { "./tools/bazel", "cquery", target_union, "--output=starlark", "--starlark:expr=" .. expr },
+            { cwd = monorepo, text = true },
+            function(cres)
+                local jars = {}
+                local seen = {}
+                for line in (cres.stdout or ""):gmatch("[^\n]+") do
+                    local jar = vim.trim(line)
+                    if jar ~= "" and not seen[jar] then
+                        seen[jar] = true
+                        if not jar:match("^/") then
+                            jar = monorepo .. "/" .. jar
+                        end
+                        table.insert(jars, jar)
+                    end
+                end
+                vim.schedule(function() on_done(jars) end)
+            end
+        )
+    end)
+end
+
+-- =========================================================================
 -- nvim-jdtls
 -- =========================================================================
 
-local function get_output_base(root_dir)
+local function get_output_base(monorepo)
     local result = vim.system(
-        { root_dir .. "/tools/bazel", "info", "output_base" },
-        { cwd = root_dir, text = true }
+        { monorepo .. "/tools/bazel", "info", "output_base" },
+        { cwd = monorepo, text = true }
     ):wait()
     if result.code == 0 then return vim.trim(result.stdout) end
 end
@@ -152,8 +248,8 @@ local function find_lombok(mason_jdtls, output_base)
     end
 end
 
-local function read_source_level(root_dir)
-    local rc = root_dir .. "/.bazelrc"
+local function read_source_level(monorepo)
+    local rc = monorepo .. "/.bazelrc"
     if vim.fn.filereadable(rc) == 0 then return nil end
     for _, line in ipairs(vim.fn.readfile(rc)) do
         local ver = line:match("^common%s+%-%-java_language_version=(%d+)")
@@ -169,7 +265,6 @@ function M.setup_jdtls()
     if not monorepo then return end
     if vim.fn.filereadable(monorepo .. "/tools/bazel") == 0 then return end
 
-    -- Use the nearest BUILD.bazel as project root so JDTLS only scans one package.
     local root_dir = vim.fs.root(0, { "BUILD.bazel", "BUILD" }) or monorepo
 
     -- Mason jdtls
@@ -191,7 +286,7 @@ function M.setup_jdtls()
         os_config_suffix = uname.machine == "aarch64" and "config_linux_arm" or "config_linux"
     end
 
-    -- Bazel output_base (needs monorepo root, not inner package)
+    -- Bazel output_base
     local output_base = get_output_base(monorepo)
     if not output_base then return end
 
@@ -248,6 +343,12 @@ function M.setup_jdtls()
         table.insert(runtimes, { name = "JavaSE-21", path = jdtls_jdk })
     end
 
+    -- Generate Eclipse project files so JDTLS knows the source roots
+    local jdk_name = "JavaSE-" .. source_level
+    local source_dirs = find_source_dirs(root_dir)
+    write_dot_project(root_dir, project_name)
+    write_dot_classpath(root_dir, source_dirs, {}, jdk_name)
+
     local config = {
         cmd = cmd,
         root_dir = root_dir,
@@ -293,6 +394,17 @@ function M.setup_jdtls()
     }
 
     jdtls.start_or_attach(config)
+
+    -- Async: fetch classpath from bazel, update .classpath, tell JDTLS to reload
+    fetch_classpath_async(monorepo, root_dir, function(jars)
+        if #jars == 0 then return end
+        write_dot_classpath(root_dir, source_dirs, jars, jdk_name)
+        notify(("%d classpath jars resolved"):format(#jars))
+        local client = vim.lsp.get_clients({ bufnr = 0, name = "jdtls" })[1]
+        if client then
+            client:request("java/buildWorkspace", false, function() end, 0)
+        end
+    end)
 
     -- JDTLS keymaps
     vim.keymap.set("n", "<leader>jo", jdtls.organize_imports, { buffer = 0, desc = "Java: organize imports" })
