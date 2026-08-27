@@ -401,6 +401,12 @@ function M.setup_jdtls()
 
         jdtls.start_or_attach(config)
 
+        -- Disable semantic tokens so JDTLS doesn't override treesitter highlighting
+        local client = vim.lsp.get_clients({ bufnr = bufnr, name = "jdtls" })[1]
+        if client then
+            client.server_capabilities.semanticTokensProvider = nil
+        end
+
         -- Async: fetch classpath from bazel, update .classpath, tell JDTLS to reload
         fetch_classpath_async(monorepo, root_dir, function(jars)
             if #jars == 0 then return end
