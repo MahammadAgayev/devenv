@@ -66,6 +66,7 @@ return {
                 "gopls",
                 "pylsp",
                 "zls",
+                "jdtls",
             },
             automatic_enable = false,
         })
