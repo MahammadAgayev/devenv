@@ -165,9 +165,12 @@ function M.setup_jdtls()
     local jdtls_ok, jdtls = pcall(require, "jdtls")
     if not jdtls_ok then return end
 
-    local root_dir = vim.fs.root(0, { ".git" })
-    if not root_dir then return end
-    if vim.fn.filereadable(root_dir .. "/tools/bazel") == 0 then return end
+    local monorepo = vim.fs.root(0, { ".git" })
+    if not monorepo then return end
+    if vim.fn.filereadable(monorepo .. "/tools/bazel") == 0 then return end
+
+    -- Use the nearest BUILD.bazel as project root so JDTLS only scans one package.
+    local root_dir = vim.fs.root(0, { "BUILD.bazel", "BUILD" }) or monorepo
 
     -- Mason jdtls
     local mason_jdtls = vim.fn.stdpath("data") .. "/mason/packages/jdtls"
@@ -188,15 +191,15 @@ function M.setup_jdtls()
         os_config_suffix = uname.machine == "aarch64" and "config_linux_arm" or "config_linux"
     end
 
-    -- Bazel output_base
-    local output_base = get_output_base(root_dir)
+    -- Bazel output_base (needs monorepo root, not inner package)
+    local output_base = get_output_base(monorepo)
     if not output_base then return end
 
     -- JDKs
     local jdtls_jdk = find_jdk(output_base, "21") or find_jdk(output_base, "25") or find_jdk(output_base, "17")
     if not jdtls_jdk then return end
 
-    local source_level = read_source_level(root_dir) or "21"
+    local source_level = read_source_level(monorepo) or "21"
     local project_jdk = find_jdk(output_base, source_level) or jdtls_jdk
 
     -- Lombok
