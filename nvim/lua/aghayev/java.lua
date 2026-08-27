@@ -215,12 +215,16 @@ end
 -- nvim-jdtls
 -- =========================================================================
 
-local function get_output_base(monorepo)
-    local result = vim.system(
+local function get_output_base_async(monorepo, on_done)
+    vim.system(
         { monorepo .. "/tools/bazel", "info", "output_base" },
-        { cwd = monorepo, text = true }
-    ):wait()
-    if result.code == 0 then return vim.trim(result.stdout) end
+        { cwd = monorepo, text = true },
+        function(result)
+            if result.code == 0 then
+                vim.schedule(function() on_done(vim.trim(result.stdout)) end)
+            end
+        end
+    )
 end
 
 local function find_jdk(output_base, version)
@@ -286,133 +290,136 @@ function M.setup_jdtls()
         os_config_suffix = uname.machine == "aarch64" and "config_linux_arm" or "config_linux"
     end
 
-    -- Bazel output_base
-    local output_base = get_output_base(monorepo)
-    if not output_base then return end
+    -- Everything below needs output_base from bazel — fetch it async to avoid
+    -- blocking the FileType event (which would prevent treesitter from starting).
+    local bufnr = vim.api.nvim_get_current_buf()
+    get_output_base_async(monorepo, function(output_base)
+        if not vim.api.nvim_buf_is_valid(bufnr) then return end
 
-    -- JDKs
-    local jdtls_jdk = find_jdk(output_base, "21") or find_jdk(output_base, "25") or find_jdk(output_base, "17")
-    if not jdtls_jdk then return end
+        -- JDKs
+        local jdtls_jdk = find_jdk(output_base, "21") or find_jdk(output_base, "25") or find_jdk(output_base, "17")
+        if not jdtls_jdk then return end
 
-    local source_level = read_source_level(monorepo) or "21"
-    local project_jdk = find_jdk(output_base, source_level) or jdtls_jdk
+        local source_level = read_source_level(monorepo) or "21"
+        local project_jdk = find_jdk(output_base, source_level) or jdtls_jdk
 
-    -- Lombok
-    local lombok_jar = find_lombok(mason_jdtls, output_base)
+        -- Lombok
+        local lombok_jar = find_lombok(mason_jdtls, output_base)
 
-    -- Workspace dir
-    local project_name = vim.fn.fnamemodify(root_dir, ":t")
-    local workspace_dir = vim.fn.expand("~") .. "/.cache/jdtls-workspace/" .. project_name
+        -- Workspace dir
+        local project_name = vim.fn.fnamemodify(root_dir, ":t")
+        local workspace_dir = vim.fn.expand("~") .. "/.cache/jdtls-workspace/" .. project_name
 
-    -- Command
-    local cmd = {
-        jdtls_jdk .. "/bin/java",
-        "-Declipse.application=org.eclipse.jdt.ls.core.id1",
-        "-Dosgi.bundles.defaultStartLevel=4",
-        "-Declipse.product=org.eclipse.jdt.ls.core.product",
-        "-Dlog.protocol=true",
-        "-Dlog.level=ALL",
-        "-Xmx8G",
-        "--add-modules=ALL-SYSTEM",
-        "--add-opens", "java.base/java.util=ALL-UNNAMED",
-        "--add-opens", "java.base/java.lang=ALL-UNNAMED",
-    }
-    if lombok_jar then
-        table.insert(cmd, "-javaagent:" .. lombok_jar)
-    end
-    vim.list_extend(cmd, {
-        "-jar", launcher,
-        "-configuration", mason_jdtls .. "/" .. os_config_suffix,
-        "-data", workspace_dir,
-    })
+        -- Command
+        local cmd = {
+            jdtls_jdk .. "/bin/java",
+            "-Declipse.application=org.eclipse.jdt.ls.core.id1",
+            "-Dosgi.bundles.defaultStartLevel=4",
+            "-Declipse.product=org.eclipse.jdt.ls.core.product",
+            "-Dlog.protocol=true",
+            "-Dlog.level=ALL",
+            "-Xmx8G",
+            "--add-modules=ALL-SYSTEM",
+            "--add-opens", "java.base/java.util=ALL-UNNAMED",
+            "--add-opens", "java.base/java.lang=ALL-UNNAMED",
+        }
+        if lombok_jar then
+            table.insert(cmd, "-javaagent:" .. lombok_jar)
+        end
+        vim.list_extend(cmd, {
+            "-jar", launcher,
+            "-configuration", mason_jdtls .. "/" .. os_config_suffix,
+            "-data", workspace_dir,
+        })
 
-    -- Capabilities
-    local cmp_ok, cmp_lsp = pcall(require, "cmp_nvim_lsp")
-    local capabilities = vim.tbl_deep_extend(
-        "force",
-        {},
-        vim.lsp.protocol.make_client_capabilities(),
-        cmp_ok and cmp_lsp.default_capabilities() or {}
-    )
+        -- Capabilities
+        local cmp_ok, cmp_lsp = pcall(require, "cmp_nvim_lsp")
+        local capabilities = vim.tbl_deep_extend(
+            "force",
+            {},
+            vim.lsp.protocol.make_client_capabilities(),
+            cmp_ok and cmp_lsp.default_capabilities() or {}
+        )
 
-    -- Runtimes
-    local runtimes = {
-        { name = "JavaSE-" .. source_level, path = project_jdk, default = true },
-    }
-    if project_jdk ~= jdtls_jdk then
-        table.insert(runtimes, { name = "JavaSE-21", path = jdtls_jdk })
-    end
+        -- Runtimes
+        local runtimes = {
+            { name = "JavaSE-" .. source_level, path = project_jdk, default = true },
+        }
+        if project_jdk ~= jdtls_jdk then
+            table.insert(runtimes, { name = "JavaSE-21", path = jdtls_jdk })
+        end
 
-    -- Generate Eclipse project files so JDTLS knows the source roots
-    local jdk_name = "JavaSE-" .. source_level
-    local source_dirs = find_source_dirs(root_dir)
-    write_dot_project(root_dir, project_name)
-    write_dot_classpath(root_dir, source_dirs, {}, jdk_name)
+        -- Generate Eclipse project files so JDTLS knows the source roots
+        local jdk_name = "JavaSE-" .. source_level
+        local source_dirs = find_source_dirs(root_dir)
+        write_dot_project(root_dir, project_name)
+        write_dot_classpath(root_dir, source_dirs, {}, jdk_name)
 
-    local config = {
-        cmd = cmd,
-        root_dir = root_dir,
-        capabilities = capabilities,
-        settings = {
-            java = {
-                autobuild = { enabled = false },
-                signatureHelp = { enabled = true },
-                contentProvider = { preferred = "fernflower" },
-                configuration = { runtimes = runtimes },
-                completion = {
-                    favoriteStaticMembers = {
-                        "org.junit.Assert.*",
-                        "org.junit.jupiter.api.Assertions.*",
-                        "org.mockito.Mockito.*",
+        local config = {
+            cmd = cmd,
+            root_dir = root_dir,
+            capabilities = capabilities,
+            settings = {
+                java = {
+                    autobuild = { enabled = false },
+                    signatureHelp = { enabled = true },
+                    contentProvider = { preferred = "fernflower" },
+                    configuration = { runtimes = runtimes },
+                    completion = {
+                        favoriteStaticMembers = {
+                            "org.junit.Assert.*",
+                            "org.junit.jupiter.api.Assertions.*",
+                            "org.mockito.Mockito.*",
+                        },
+                        importOrder = { "com.uber", "com", "org", "java", "javax" },
                     },
-                    importOrder = { "com.uber", "com", "org", "java", "javax" },
-                },
-                sources = {
-                    organizeImports = {
-                        starThreshold = 9999,
-                        staticStarThreshold = 9999,
+                    sources = {
+                        organizeImports = {
+                            starThreshold = 9999,
+                            staticStarThreshold = 9999,
+                        },
                     },
-                },
-                import = {
-                    exclusions = {
-                        "**/bazel-*/**",
-                        "**/node_modules/**",
-                        "**/.git/**",
+                    import = {
+                        exclusions = {
+                            "**/bazel-*/**",
+                            "**/node_modules/**",
+                            "**/.git/**",
+                        },
                     },
-                },
-                project = {
-                    outputPath = workspace_dir .. "/bin",
+                    project = {
+                        outputPath = workspace_dir .. "/bin",
+                    },
                 },
             },
-        },
-        init_options = {
-            extendedClientCapabilities = jdtls.extendedClientCapabilities,
-        },
-        handlers = {
-            ["language/status"] = function() end,
-        },
-    }
+            init_options = {
+                extendedClientCapabilities = jdtls.extendedClientCapabilities,
+            },
+            handlers = {
+                ["language/status"] = function() end,
+            },
+        }
 
-    jdtls.start_or_attach(config)
+        jdtls.start_or_attach(config)
 
-    -- Async: fetch classpath from bazel, update .classpath, tell JDTLS to reload
-    fetch_classpath_async(monorepo, root_dir, function(jars)
-        if #jars == 0 then return end
-        write_dot_classpath(root_dir, source_dirs, jars, jdk_name)
-        notify(("%d classpath jars resolved"):format(#jars))
-        local client = vim.lsp.get_clients({ bufnr = 0, name = "jdtls" })[1]
-        if client then
-            client:request("java/buildWorkspace", false, function() end, 0)
-        end
+        -- Async: fetch classpath from bazel, update .classpath, tell JDTLS to reload
+        fetch_classpath_async(monorepo, root_dir, function(jars)
+            if #jars == 0 then return end
+            write_dot_classpath(root_dir, source_dirs, jars, jdk_name)
+            notify(("%d classpath jars resolved"):format(#jars))
+            local client = vim.lsp.get_clients({ bufnr = bufnr, name = "jdtls" })[1]
+            if client then
+                client:request("java/buildWorkspace", false, function() end, bufnr)
+            end
+        end)
+
+        -- JDTLS keymaps
+        vim.keymap.set("n", "<leader>jo", jdtls.organize_imports, { buffer = bufnr, desc = "Java: organize imports" })
+        vim.keymap.set("n", "<leader>jv", jdtls.extract_variable, { buffer = bufnr, desc = "Java: extract variable" })
+        vim.keymap.set("v", "<leader>jv", function() jdtls.extract_variable(true) end, { buffer = bufnr, desc = "Java: extract variable" })
+        vim.keymap.set("n", "<leader>jc", jdtls.extract_constant, { buffer = bufnr, desc = "Java: extract constant" })
+        vim.keymap.set("v", "<leader>jc", function() jdtls.extract_constant(true) end, { buffer = bufnr, desc = "Java: extract constant" })
+        vim.keymap.set("v", "<leader>jm", function() jdtls.extract_method(true) end, { buffer = bufnr, desc = "Java: extract method" })
     end)
-
-    -- JDTLS keymaps
-    vim.keymap.set("n", "<leader>jo", jdtls.organize_imports, { buffer = 0, desc = "Java: organize imports" })
-    vim.keymap.set("n", "<leader>jv", jdtls.extract_variable, { buffer = 0, desc = "Java: extract variable" })
-    vim.keymap.set("v", "<leader>jv", function() jdtls.extract_variable(true) end, { buffer = 0, desc = "Java: extract variable" })
-    vim.keymap.set("n", "<leader>jc", jdtls.extract_constant, { buffer = 0, desc = "Java: extract constant" })
-    vim.keymap.set("v", "<leader>jc", function() jdtls.extract_constant(true) end, { buffer = 0, desc = "Java: extract constant" })
-    vim.keymap.set("v", "<leader>jm", function() jdtls.extract_method(true) end, { buffer = 0, desc = "Java: extract method" })
 end
 
 return M
