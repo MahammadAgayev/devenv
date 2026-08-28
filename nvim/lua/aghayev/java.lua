@@ -193,6 +193,13 @@ local function fetch_classpath_async(monorepo, pkg_dir, on_done)
             { "./tools/bazel", "cquery", target_union, "--output=starlark", "--starlark:expr=" .. expr },
             { cwd = monorepo, text = true },
             function(cres)
+                if cres.code ~= 0 then
+                    vim.schedule(function()
+                        notify("bazel cquery failed: " .. vim.trim((cres.stderr or ""):sub(-300)),
+                            vim.log.levels.ERROR)
+                    end)
+                    return
+                end
                 local jars = {}
                 local seen = {}
                 for line in (cres.stdout or ""):gmatch("[^\n]+") do
@@ -412,7 +419,15 @@ function M.setup_jdtls()
             notify(("%d classpath jars resolved"):format(#jars))
             local client = vim.lsp.get_clients({ bufnr = bufnr, name = "jdtls" })[1]
             if client then
-                client:request("java/buildWorkspace", false, function() end, bufnr)
+                -- Notify JDTLS that .classpath changed so it re-reads the project model
+                client:notify("workspace/didChangeWatchedFiles", {
+                    changes = {
+                        { uri = vim.uri_from_fname(root_dir .. "/.classpath"), type = 2 },
+                        { uri = vim.uri_from_fname(root_dir .. "/.project"), type = 2 },
+                    },
+                })
+                -- Force a full rebuild with the updated classpath
+                client:request("java/buildWorkspace", true, function() end, bufnr)
             end
         end)
 
