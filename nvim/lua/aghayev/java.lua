@@ -175,13 +175,24 @@ local function fetch_classpath_async(monorepo, pkg_dir, on_done)
 
     local query = ('kind("java_library|java_test", %s:all)'):format(pkg)
     vim.system({ "./tools/bazel", "query", query }, { cwd = monorepo, text = true }, function(qres)
+        if qres.code ~= 0 then
+            vim.schedule(function()
+                notify("bazel query failed (exit " .. qres.code .. "): "
+                    .. vim.trim((qres.stderr or ""):sub(-300)), vim.log.levels.ERROR)
+                on_done({})
+            end)
+            return
+        end
         local targets = {}
         for line in (qres.stdout or ""):gmatch("[^\n]+") do
             local t = vim.trim(line)
             if t ~= "" then table.insert(targets, t) end
         end
         if #targets == 0 then
-            vim.schedule(function() on_done({}) end)
+            vim.schedule(function()
+                notify("no java_library/java_test targets in " .. pkg, vim.log.levels.WARN)
+                on_done({})
+            end)
             return
         end
 
