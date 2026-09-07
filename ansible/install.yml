@@ -92,6 +92,11 @@
       shell: command -v pi || test -x {{ home }}/.bun/bin/pi
       changed_when: false
 
+    - name: Install mason4agents for Pi
+      shell: pi install npm:mason4agents
+      args:
+        creates: "{{ home }}/.pi/agent/npm/node_modules/mason4agents"
+
     - name: Update nvim-treesitter plugin
       shell: nvim --headless -c "Lazy! update nvim-treesitter" -c "qa" 2>/dev/null || true
 

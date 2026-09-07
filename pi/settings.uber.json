@@ -12,7 +12,8 @@
   "packages": [
     "~/devenv",
     "https://github.com/carderne/pi-nvim",
-    "https://github.com/MahammadAgayev/chorus.pi"
+    "https://github.com/MahammadAgayev/chorus.pi",
+    "npm:mason4agents"
   ],
   "lastChangelogVersion": "0.80.3",
   "theme": "rose-pine-moon"
