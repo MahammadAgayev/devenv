@@ -313,6 +313,8 @@ async function consultOracle(ctx: LoopContext, state: HarnessState): Promise<Ora
     }
   }
 
+  return {
+    verdict: validation.verdict,
     exitCode: validation.exitCode,
     evaluatorVerdict,
     findings,
