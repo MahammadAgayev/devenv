@@ -13,7 +13,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { checkAgentArgs, checkEmptyRequiredArgs } from "../tool-call-guard-rules.ts";
+import { checkAgentArgs, checkEmptyRequiredArgs } from "../lib/tool-call-guard-rules.ts";
 
 const scoutTask = (n: number) => ({
   agent: "scout",

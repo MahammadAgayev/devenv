@@ -142,6 +142,32 @@ describe("sanitize", () => {
   it("strips leading and trailing dashes", () => {
     assert.equal(sanitize("--weird--"), "weird");
   });
+
+  it("caps the length", () => {
+    // A name becomes a directory and is echoed into every iteration prompt.
+    // Observed in a real run: answering the name prompt with a sentence
+    // produced a 45-character folder.
+    const sentence = sanitize("Refactor harness, make architecturally correct");
+    assert.ok(sentence.length <= 40, `got ${sentence.length}: ${sentence}`);
+    assert.equal(sanitize("a".repeat(80)).length, 40);
+  });
+
+  it("cuts at a word boundary when truncating", () => {
+    const out = sanitize("Refactor harness, make architecturally correct");
+    assert.ok(!out.endsWith("-"), `should not end mid-separator: ${out}`);
+    assert.equal(out, "Refactor-harness-make-architecturally");
+  });
+
+  it("does not collapse a long unbroken name to nothing", () => {
+    // The word-boundary cut must not fire when the only dash is near the start.
+    const out = sanitize(`${"a".repeat(38)}-b`);
+    assert.ok(out.length >= 20, `truncation ate the name: ${JSON.stringify(out)}`);
+  });
+
+  it("leaves names at or under the cap untouched", () => {
+    assert.equal(sanitize("x".repeat(40)), "x".repeat(40));
+    assert.equal(sanitize("x".repeat(39)), "x".repeat(39));
+  });
 });
 
 /**

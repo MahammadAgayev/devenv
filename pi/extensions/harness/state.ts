@@ -118,12 +118,37 @@ export function steerPath(name: string): string {
   return join(runDir(name), "STEER.md");
 }
 
-/** Keep run names filesystem-safe and predictable for autocompletion. */
+/**
+ * Longest run name we will create.
+ *
+ * A name is a directory under `~/.pi/harness/` and is echoed into every
+ * iteration prompt, twice, along with the paths built from it. Sentence-length
+ * names ("Refactor harness, make architecturally correct" → a 45-character
+ * folder) are what happens when the prompt is answered with a description
+ * instead of a label, so trim rather than let it through.
+ */
+const MAX_NAME_LENGTH = 40;
+
+/**
+ * Keep run names filesystem-safe, bounded, and predictable for autocompletion.
+ *
+ * Truncation cuts at a word boundary when there is one in range, so a clipped
+ * name still reads as words rather than ending mid-token.
+ */
 export function sanitize(name: string): string {
-  return name
+  const cleaned = name
     .trim()
     .replace(/[^a-zA-Z0-9._-]+/g, "-")
     .replace(/^[-.]+|-+$/g, "");
+
+  if (cleaned.length <= MAX_NAME_LENGTH) return cleaned;
+
+  const clipped = cleaned.slice(0, MAX_NAME_LENGTH);
+  const lastDash = clipped.lastIndexOf("-");
+  // Only prefer the word boundary if it keeps most of the budget; otherwise a
+  // name like "aaaa...-b" would collapse to almost nothing.
+  const cut = lastDash >= MAX_NAME_LENGTH / 2 ? clipped.slice(0, lastDash) : clipped;
+  return cut.replace(/[-.]+$/, "");
 }
 
 export function listRuns(): string[] {

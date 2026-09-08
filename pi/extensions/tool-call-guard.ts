@@ -43,11 +43,11 @@ import {
   checkGitPush,
   checkReadDirectory,
   normalizeFffPath,
-} from "./tool-call-guard-rules.ts";
+} from "./lib/tool-call-guard-rules.ts";
 
 // The rules live in their own module so they can be tested without pi on the
 // module graph. Re-exported here so this file stays the single entry point.
-export * from "./tool-call-guard-rules.ts";
+export * from "./lib/tool-call-guard-rules.ts";
 
 // ── Extension wiring ─────────────────────────────────────────────────────────
 

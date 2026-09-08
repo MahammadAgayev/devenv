@@ -22,7 +22,11 @@
  * was handed.
  */
 
-import type { ExtensionCommandContext, ReplacedSessionContext } from "@earendil-works/pi-coding-agent";
+import type {
+  ExtensionAPI,
+  ExtensionCommandContext,
+  ReplacedSessionContext,
+} from "@earendil-works/pi-coding-agent";
 import { spawn } from "node:child_process";
 import { CONFIG } from "./config.ts";
 import { setActiveRun } from "./control.ts";
@@ -52,6 +56,43 @@ type EndReason =
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /**
+ * Any context the loop can run against.
+ *
+ * The two differ in one way that matters: `ReplacedSessionContext` (handed to
+ * `withSession` after a reset) carries its own bound `sendUserMessage`, while
+ * the plain `ExtensionCommandContext` from a command handler does NOT — sending
+ * from there goes through the `pi` API object instead. See `sendPrompt`.
+ */
+type LoopContext = ExtensionCommandContext | ReplacedSessionContext;
+
+/**
+ * Send a user message from whichever context we hold.
+ *
+ * `sendUserMessage` lives on `ExtensionAPI` and on `ReplacedSessionContext`,
+ * but *not* on `ExtensionCommandContext` (verified against
+ * `dist/core/extensions/types.d.ts`: the command-context interface has only
+ * `getSystemPromptOptions`, `waitForIdle`, `newSession`, `fork`,
+ * `navigateTree`, `switchSession`, and `reload`).
+ *
+ * Calling `ctx.sendUserMessage(...)` on a command context is a TypeError, which
+ * is precisely how the first version of this loop failed: `/harness start`
+ * threw on its very first send, the surrounding catch logged to the run's
+ * log.md and returned, and the user saw nothing happen at all.
+ *
+ * After a reset the replacement context is the correct sender — it is bound to
+ * the new session, whereas `pi` may still reference the old one — so prefer it
+ * when present and fall back to the API object otherwise.
+ */
+async function sendPrompt(pi: ExtensionAPI, ctx: LoopContext, content: string): Promise<void> {
+  const bound = (ctx as ReplacedSessionContext).sendUserMessage;
+  if (typeof bound === "function") {
+    await bound.call(ctx, content);
+    return;
+  }
+  await pi.sendUserMessage(content);
+}
+
+/**
  * Wait for the agent to pick up the message we just sent, then go idle again.
  *
  * `sendUserMessage()` resolves before streaming begins, so a bare
@@ -62,7 +103,7 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
  * If the turn never starts within the timeout, we fall through rather than
  * hanging: better a wasted iteration than a run wedged forever.
  */
-async function waitForTurn(ctx: ExtensionCommandContext): Promise<void> {
+async function waitForTurn(ctx: LoopContext): Promise<void> {
   const deadline = Date.now() + CONFIG.turnStartTimeoutMs;
   while (ctx.isIdle() && Date.now() < deadline) {
     await sleep(CONFIG.pollIntervalMs);
@@ -92,7 +133,7 @@ function commitBackstop(cwd: string, message: string): void {
 }
 
 /** Percent of context used, or null when pi cannot say yet. */
-function contextPercent(ctx: ExtensionCommandContext): number | null {
+function contextPercent(ctx: LoopContext): number | null {
   try {
     return ctx.getContextUsage()?.percent ?? null;
   } catch {
@@ -100,7 +141,7 @@ function contextPercent(ctx: ExtensionCommandContext): number | null {
   }
 }
 
-function recordSession(state: HarnessState, ctx: ExtensionCommandContext): void {
+function recordSession(state: HarnessState, ctx: LoopContext): void {
   let file: string | undefined;
   try {
     file = ctx.sessionManager.getSessionFile?.();
@@ -121,7 +162,8 @@ function recordSession(state: HarnessState, ctx: ExtensionCommandContext): void 
  * which is correct behaviour, and not worth complicating either side to avoid.
  */
 async function finishRun(
-  ctx: ExtensionCommandContext,
+  pi: ExtensionAPI,
+  ctx: LoopContext,
   state: HarnessState,
   reason: EndReason,
   status: HarnessState["status"],
@@ -133,7 +175,7 @@ async function finishRun(
   const stoppedByUser = reason === "stopped by user";
   if (!stoppedByUser) {
     try {
-      await ctx.sendUserMessage(finalNotePrompt(state, runDir(state.name), reason));
+      await sendPrompt(pi, ctx, finalNotePrompt(state, runDir(state.name), reason));
       await waitForTurn(ctx);
     } catch {
       /* the run is over; a missing closing note is not worth surfacing */
@@ -155,7 +197,8 @@ async function finishRun(
  * mode.
  */
 export async function runLoop(
-  ctx: ExtensionCommandContext | ReplacedSessionContext,
+  pi: ExtensionAPI,
+  ctx: LoopContext,
   name: string,
   freshSession: boolean,
 ): Promise<void> {
@@ -185,11 +228,11 @@ export async function runLoop(
   for (;;) {
     // ── Stop checks, before spending a turn ──────────────────────────────
     if (stopRequested(name)) {
-      await finishRun(ctx, state, "stopped by user", "stopped");
+      await finishRun(pi, ctx, state, "stopped by user", "stopped");
       return;
     }
     if (state.iteration >= CONFIG.maxIterations) {
-      await finishRun(ctx, state, "hit the iteration limit", "failed");
+      await finishRun(pi, ctx, state, "hit the iteration limit", "failed");
       return;
     }
 
@@ -209,14 +252,22 @@ export async function runLoop(
     isFresh = false;
 
     try {
-      await ctx.sendUserMessage(prompt);
+      await sendPrompt(pi, ctx, prompt);
     } catch (err) {
-      // The session went away underneath us (reload, shutdown, manual /new).
-      // Nothing to recover: the run is recorded and can be resumed later.
-      appendLog(name, `send failed: ${err instanceof Error ? err.message : String(err)}`);
-      state.status = "idle";
+      // Usually the session going away underneath us (reload, shutdown, manual
+      // /new), which is not recoverable but is also not alarming.
+      //
+      // It is surfaced in the UI rather than only appended to log.md because
+      // the first version of this loop swallowed a TypeError here — sending on
+      // a context that has no `sendUserMessage` — and `/harness start` did
+      // nothing at all, with no visible reason. A run that cannot send its
+      // first prompt has failed; say so where the user is looking.
+      const message = err instanceof Error ? err.message : String(err);
+      appendLog(name, `send failed: ${message}`);
+      state.status = "failed";
       writeState(state);
       setActiveRun(null);
+      ctx.ui.notify(`harness "${name}": could not send the iteration prompt — ${message}`, "error");
       return;
     }
 
@@ -238,7 +289,7 @@ export async function runLoop(
     consecutiveErrors = validation.verdict === "ERROR" ? consecutiveErrors + 1 : 0;
     if (consecutiveErrors >= 3) {
       writeState(state);
-      await finishRun(ctx, state, "the validation command is broken", "failed");
+      await finishRun(pi, ctx, state, "the validation command is broken", "failed");
       return;
     }
 
@@ -277,12 +328,12 @@ export async function runLoop(
     // ── Done? ────────────────────────────────────────────────────────────
     const done = validation.verdict === "PASS" && (!CONFIG.useEvaluator || evaluatorVerdict === "PASS");
     if (done) {
-      await finishRun(ctx, state, "validation passed and review confirmed it", "done");
+      await finishRun(pi, ctx, state, "validation passed and review confirmed it", "done");
       return;
     }
 
     if (stopRequested(name)) {
-      await finishRun(ctx, state, "stopped by user", "stopped");
+      await finishRun(pi, ctx, state, "stopped by user", "stopped");
       return;
     }
 
@@ -291,7 +342,7 @@ export async function runLoop(
     if (percent !== null && percent >= CONFIG.resetThresholdPercent) {
       const resets = state.sessionChain.length;
       if (resets >= CONFIG.maxResets) {
-        await finishRun(ctx, state, "hit the reset limit", "failed");
+        await finishRun(pi, ctx, state, "hit the reset limit", "failed");
         return;
       }
 
@@ -310,14 +361,14 @@ export async function runLoop(
           // is now stale and must not be touched again on this path.
           await fresh.sendUserMessage(seed);
           await fresh.waitForIdle();
-          await runLoop(fresh, runName, true);
+          await runLoop(pi, fresh, runName, true);
         },
       });
 
       if (result.cancelled) {
         appendLog(runName, "session reset was cancelled — ending run");
         // `ctx` is still valid precisely because the replacement did not happen.
-        await finishRun(ctx, state, "interrupted", "idle");
+        await finishRun(pi, ctx, state, "interrupted", "idle");
       }
       // The recursive call owns the run now. This frame is done either way.
       return;
@@ -326,7 +377,11 @@ export async function runLoop(
 }
 
 /** Entry point for `/harness start`. Clears any stale stop flag first. */
-export async function startRun(ctx: ExtensionCommandContext, name: string): Promise<void> {
+export async function startRun(
+  pi: ExtensionAPI,
+  ctx: ExtensionCommandContext,
+  name: string,
+): Promise<void> {
   clearStop(name);
-  await runLoop(ctx, name, true);
+  await runLoop(pi, ctx, name, true);
 }

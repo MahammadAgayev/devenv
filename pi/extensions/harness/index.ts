@@ -23,6 +23,7 @@ import { existsSync } from "node:fs";
 import { CONFIG } from "./config.ts";
 import { getActiveRun, registerStopGate, setActiveRun } from "./control.ts";
 import { startRun } from "./loop.ts";
+import { runValidation } from "./oracle.ts";
 import { recap } from "./recap.ts";
 import {
   createRun,
@@ -231,7 +232,7 @@ export default function (pi: ExtensionAPI) {
           );
           if (!proceed) return;
 
-          await startRun(ctx, name);
+          await startRun(pi, ctx, name);
           return;
         }
 
@@ -286,6 +287,44 @@ async function initRun(ctx: ExtensionCommandContext, requested: string): Promise
   if (!validationCommand) {
     ctx.ui.notify("harness: a run needs a validation command — it is the oracle", "error");
     return;
+  }
+
+  // Actually run it before accepting it.
+  //
+  // The command is the entire basis for deciding done-ness, and a typo is
+  // indistinguishable from a failing suite until three iterations have been
+  // burned proving it. Checking here costs one command run and catches the
+  // whole class — wrong name, not on PATH, wrong directory.
+  //
+  // A non-zero exit is expected and fine: at init the work is not done, so a
+  // real oracle *should* fail. Only "could not execute at all" is fatal.
+  ctx.ui.notify(`Checking \`${validationCommand}\`…`, "info");
+  const probe = await runValidation(validationCommand, ctx.cwd);
+
+  if (probe.verdict === "ERROR") {
+    const proceed = await ctx.ui.confirm(
+      "That command does not run",
+      [
+        `\`${validationCommand}\` could not be executed in ${ctx.cwd}:`,
+        "",
+        probe.output.slice(0, 400) || "(no output)",
+        "",
+        "The validation command is how the harness decides the work is done.",
+        "If it cannot run, every iteration is unmeasurable and the run will",
+        "give up after three attempts.",
+        "",
+        "Create the run anyway? (Fix the command in state.json before starting.)",
+      ].join("\n"),
+    );
+    if (!proceed) return;
+  } else {
+    // Exit 0 at init usually means the command does not measure the new work
+    // — an empty test suite, or a filter that matches nothing.
+    const summary =
+      probe.verdict === "PASS"
+        ? "it already exits 0, so it does not yet measure the work you are asking for"
+        : `it runs and currently fails (exit ${probe.exitCode}) — which is what you want at the start`;
+    ctx.ui.notify(`Validation command OK: ${summary}.`, probe.verdict === "PASS" ? "warning" : "info");
   }
 
   const task = [

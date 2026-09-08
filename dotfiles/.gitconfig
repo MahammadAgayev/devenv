@@ -1,7 +1,7 @@
 [user]
 	name = Mahammad Aghayev
 	email = mahammadmaghayev@gmail.com
-	signingkey =
+	signingkey = 9B:CE:93:6D:ED:78:6C:A4:14:47:7F:1D:2E:92:8F:2B:CF:72:4C:43
 
 [alias]
     lg = log --graph --pretty=format:'%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%ar) %C(bold blue)<%an>%Creset'
@@ -56,3 +56,7 @@
 # Override all with uber config
 [include]
 	path = ~/.gitconfig_uber
+[gpg]
+	format = x509
+[gpg "x509"]
+	program = /opt/uber/bin/signingfx

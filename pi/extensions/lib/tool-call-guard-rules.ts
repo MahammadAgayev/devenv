@@ -1,15 +1,22 @@
 /**
  * tool-call-guard rules — the pure decision layer.
  *
- * Split from `tool-call-guard.ts` so the rules can be imported without pulling
- * in pi itself. The wiring module imports `isToolCallEventType` from
- * `@earendil-works/pi-coding-agent`, which is a peer dependency supplied by the
- * pi runtime; this repo has no node_modules, so a test that reached these
- * functions through the wiring module could not resolve it.
+ * Split from `../tool-call-guard.ts` for two reasons, one of which is a hard
+ * requirement:
+ *
+ * 1. pi loads every top-level `.ts` in `extensions/` as an extension and
+ *    rejects any file without a default factory export. A sibling module would
+ *    fail to load with "does not export a valid factory function", so shared
+ *    code lives in `lib/` — same as `paths.ts` and `tui-shared.ts`.
+ *
+ * 2. The wiring module imports `isToolCallEventType` from
+ *    `@earendil-works/pi-coding-agent`, a peer dependency supplied by the pi
+ *    runtime. This repo has no node_modules, so a test reaching these functions
+ *    through the wiring module could not resolve it.
  *
  * Nothing here touches pi's API. Every function is a pure predicate over
  * (tool name, arguments, cwd) returning a block-reason string or null, which is
- * what makes them testable at all — see test/tool-call-guard.test.ts.
+ * what makes them testable at all — see `../test/tool-call-guard.test.ts`.
  */
 
 import { execSync } from "node:child_process";

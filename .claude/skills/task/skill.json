@@ -1,0 +1,6 @@
+{
+  "name": "task",
+  "description": "Manage software engineering tasks with structured planning and logging",
+  "version": "1.0.0",
+  "instructions": ".claude/skills/task/instructions.md"
+}
