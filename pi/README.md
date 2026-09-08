@@ -12,9 +12,12 @@ top-level config files (settings/models/keybindings/AGENTS.md).
 | `prompts/` | package prompts | Prompt templates — each `.md` becomes a `/command` |
 | `skills/` | package skills | Skills (auto-discovered by intent) |
 | `themes/` | package themes | Color themes |
+| `agents/` | symlink (not the package) | Subagent definitions — `.md` per agent, symlinked to `~/.pi/agent/agents` |
 
 The repo root `package.json` declares the `pi` manifest with
-`extensions`/`prompts`/`skills`/`themes` entries under `pi/`.
+`extensions`/`prompts`/`skills`/`themes` entries under `pi/`. `agents/` is not part
+of the manifest — pi discovers agents from `~/.pi/agent/agents`, which
+`ansible/configure.yml` points at `pi/agents`.
 
 `settings.uber.json` / `models.uber.json` symlink to `settings.json` / `models.json`
 on the `uber` profile (`settings.json` / `models.json` on `personal`). Both list

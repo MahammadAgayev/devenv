@@ -1,33 +1,38 @@
 /**
  * task-handoff.ts — /handoff + /takeover
  *
- * Maintains a single per-task handoff doc under `<repo>/.pi/tasks/<name>.md`
- * with Task / Goal / Summary / Log sections.
+ * Handoff docs live at `~/.pi/tasks/<name>.md` (Task / Goal / Summary / Log) and
+ * exist so a future session can resume work without the session that produced it.
  *
- *   /handoff <name>   Update (or create) the handoff doc. The agent regenerates
- *                     the Summary from this session's work and appends a
- *                     timestamped Log entry. Task/Goal are preserved.
- *   /takeover <name>  Load an existing handoff doc into a fresh session so the
- *                     agent can pick up where the last one left off.
+ *   /handoff [name]   Dump this session's transcript and hand it to the `handoff`
+ *                     subagent, which writes the doc. Runs out-of-band: no message
+ *                     enters this conversation, so it is safe to fire mid-turn and
+ *                     costs the main context almost nothing.
+ *   /takeover [name]  Load a doc into context as background reading. With no
+ *                     argument it picks the best match for the current
+ *                     repo/branch/cwd. Loads only — it does not start work.
  *
- * Task names are auto-discovered from existing `*.md` files in the tasks dir.
- * `/handoff` also accepts a brand-new name (it seeds the template).
+ * Why a subagent for /handoff: writing the doc means re-reading the whole session
+ * and re-emitting several KB of prose. Done inline that lands in this context
+ * window twice over. The subagent gets the transcript as a file and returns one line.
  */
 
-import { CONFIG_DIR_NAME, type ExtensionAPI, type ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
+import {
+  CONFIG_DIR_NAME,
+  type ExtensionAPI,
+  type ExtensionCommandContext,
+} from "@earendil-works/pi-coding-agent";
 import type { AutocompleteItem } from "@earendil-works/pi-tui";
-import { existsSync, mkdirSync, readFileSync, readdirSync } from "node:fs";
-import { homedir } from "node:os";
+import { execFileSync } from "node:child_process";
+import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
+import { homedir, tmpdir } from "node:os";
 import { basename, join } from "node:path";
+import { runAgentHeadless } from "./agents/index.ts";
 
 // Tasks live under the global agent config dir (~/.pi/tasks), not per-repo, so
 // handoffs survive across repos and never land inside a git working tree.
 function tasksDir(): string {
   return join(homedir(), CONFIG_DIR_NAME, "tasks");
-}
-
-function taskPath(name: string): string {
-  return join(tasksDir(), `${sanitize(name)}.md`);
 }
 
 // Keep names filesystem-safe and predictable for autocompletion.
@@ -55,91 +60,263 @@ function completions(prefix: string): AutocompleteItem[] | null {
   return items.length > 0 ? items : null;
 }
 
-function template(name: string): string {
-  return `# Task: ${name}
+/** Read-only git facts, or undefined outside a repo. */
+function gitInfo(cwd: string): { branch?: string; repo?: string } {
+  const run = (...args: string[]): string | undefined => {
+    try {
+      return execFileSync("git", ["-C", cwd, ...args], {
+        encoding: "utf-8",
+        stdio: ["ignore", "pipe", "ignore"],
+      }).trim();
+    } catch {
+      return undefined;
+    }
+  };
+  const root = run("rev-parse", "--show-toplevel");
+  return {
+    branch: run("rev-parse", "--abbrev-ref", "HEAD"),
+    repo: root ? basename(root) : undefined,
+  };
+}
 
-## Goal
-<one-paragraph objective — set once, edited rarely>
+// Long tool results are the bulk of a transcript and the least of its meaning,
+// so they get clipped hard. Assistant prose is where the decisions live.
+const TOOL_RESULT_CLIP = 600;
+const TEXT_CLIP = 4000;
 
-## Summary
-<current state: what's done, what's in flight, key decisions, files touched>
+function clip(text: string, max: number): string {
+  return text.length <= max ? text : `${text.slice(0, max)}\n… [${text.length - max} more chars]`;
+}
 
-## Log
-`;
+function partsToText(content: unknown): string {
+  if (typeof content === "string") return content;
+  if (!Array.isArray(content)) return "";
+  return content
+    .map((part: any) => {
+      if (part?.type === "text") return part.text ?? "";
+      if (part?.type === "image") return "[image]";
+      return "";
+    })
+    .filter(Boolean)
+    .join("\n");
+}
+
+/**
+ * Render the active branch as markdown for the handoff agent.
+ *
+ * Uses `buildContextEntries()` rather than `getEntries()`: it follows the live
+ * branch and honours compaction, so the subagent sees what this session actually
+ * has in context — not abandoned branches or pre-compaction history.
+ */
+function dumpTranscript(ctx: ExtensionCommandContext): string {
+  const entries = ctx.sessionManager.buildContextEntries();
+  const out: string[] = [];
+
+  for (const entry of entries as any[]) {
+    const msg = entry?.message;
+    if (!msg) continue;
+
+    switch (msg.role) {
+      case "user":
+        out.push(`## User\n\n${clip(partsToText(msg.content), TEXT_CLIP)}`);
+        break;
+
+      case "assistant": {
+        const text = msg.content
+          .filter((p: any) => p.type === "text")
+          .map((p: any) => p.text)
+          .join("\n");
+        const calls = msg.content
+          .filter((p: any) => p.type === "toolCall")
+          .map((p: any) => `- \`${p.name}\` ${clip(JSON.stringify(p.arguments ?? {}), 300)}`);
+        const body = [text && clip(text, TEXT_CLIP), calls.length ? `Tool calls:\n${calls.join("\n")}` : ""]
+          .filter(Boolean)
+          .join("\n\n");
+        if (body) out.push(`## Assistant\n\n${body}`);
+        break;
+      }
+
+      case "toolResult":
+        out.push(
+          `## Tool result (${msg.toolName}${msg.isError ? ", ERROR" : ""})\n\n` +
+            clip(partsToText(msg.content), TOOL_RESULT_CLIP),
+        );
+        break;
+
+      case "bashExecution":
+        out.push(`## Shell\n\n\`${msg.command}\` → exit ${msg.exitCode}\n\n${clip(msg.output ?? "", TOOL_RESULT_CLIP)}`);
+        break;
+
+      case "compactionSummary":
+        out.push(`## [earlier context, compacted]\n\n${msg.summary}`);
+        break;
+
+      case "branchSummary":
+        out.push(`## [abandoned branch, summarized]\n\n${msg.summary}`);
+        break;
+    }
+  }
+
+  return out.join("\n\n---\n\n");
+}
+
+/**
+ * Score a task doc against the current environment.
+ *
+ * A doc that names a *feature* branch is a strong signal; the repo is a decent
+ * one; cwd weaker still (many docs mention a path in passing). Ties break by
+ * mtime, since the doc touched last is usually the thread being continued.
+ *
+ * Trunk branch names are ignored outright: scoring on `main` matched every doc
+ * containing the word, which picked the wrong task in testing.
+ */
+const TRUNK_BRANCHES = new Set(["main", "master", "trunk", "develop", "HEAD"]);
+
+function rankTasks(cwd: string, git: { branch?: string; repo?: string }): { name: string; score: number }[] {
+  return listTasks()
+    .map((name) => {
+      const file = join(tasksDir(), `${name}.md`);
+      let text: string;
+      let mtime = 0;
+      try {
+        text = readFileSync(file, "utf-8").toLowerCase();
+        mtime = statSync(file).mtimeMs;
+      } catch {
+        return { name, score: 0, mtime: 0 };
+      }
+      let score = 0;
+      if (git.branch && !TRUNK_BRANCHES.has(git.branch) && text.includes(git.branch.toLowerCase())) score += 5;
+      if (git.repo && text.includes(git.repo.toLowerCase())) score += 3;
+      if (text.includes(cwd.toLowerCase())) score += 2;
+      if (git.repo && name.toLowerCase().includes(git.repo.toLowerCase())) score += 2;
+      return { name, score, mtime };
+    })
+    .sort((a, b) => b.score - a.score || b.mtime - a.mtime)
+    .filter((t) => t.score > 0)
+    .map(({ name, score }) => ({ name, score }));
 }
 
 export default function (pi: ExtensionAPI) {
   pi.registerCommand("handoff", {
-    description: "Write/update the handoff doc for a task (~/.pi/tasks/<name>.md)",
+    description: "Write/update a task handoff doc via the handoff subagent (name optional)",
     getArgumentCompletions: (prefix) => completions(prefix),
     handler: async (args: string, ctx: ExtensionCommandContext) => {
-      const name = sanitize(args);
-      if (!name) {
-        ctx.ui.notify("Usage: /handoff <taskname>", "error");
+      const requested = sanitize(args);
+      const dir = tasksDir();
+      mkdirSync(dir, { recursive: true });
+
+      // Fired mid-turn, the transcript would stop at the in-flight tool call and
+      // the doc would record its outcome as unknown (observed in testing). Let the
+      // turn settle first so the summary covers it. This never throws, unlike a
+      // bare sendUserMessage during streaming.
+      if (!ctx.isIdle()) {
+        ctx.ui.notify("Handoff queued — waiting for the current turn to finish…", "info");
+        await ctx.waitForIdle();
+      }
+
+      const transcript = dumpTranscript(ctx);
+      if (!transcript.trim()) {
+        ctx.ui.notify("Nothing to hand off — this session is empty", "error");
         return;
       }
 
-      const dir = tasksDir();
-      mkdirSync(dir, { recursive: true });
-      const path = taskPath(name);
-      const exists = existsSync(path);
-      const current = exists ? readFileSync(path, "utf-8") : template(name);
+      const transcriptPath = join(tmpdir(), `pi-handoff-${Date.now()}.md`);
+      writeFileSync(transcriptPath, transcript, { encoding: "utf-8", mode: 0o600 });
+
+      const git = gitInfo(ctx.cwd);
       const now = new Date().toISOString().slice(0, 16).replace("T", " ");
 
-      const prompt = [
-        `Update the handoff doc for task "${name}" at ${path}.`,
+      const task = [
+        `Write the handoff doc for the session transcribed at: ${transcriptPath}`,
         "",
-        "Rules:",
-        `- Keep the "# Task" heading and the "## Goal" section. If Goal is still the placeholder, fill it in from what you know about this task.`,
-        `- Regenerate the "## Summary" section to reflect the CURRENT state of the work from this session (what's done, what's in flight, key decisions, files touched). Replace the old summary, don't append to it.`,
-        `- Append ONE new bullet to the "## Log" section, prefixed "- ${now} — ", describing what happened this session. Keep older log entries.`,
-        `- Write the full updated document back with the write/edit tool. Do not print it in chat.`,
+        `Tasks directory: ${dir}`,
+        `Existing tasks: ${listTasks().join(", ") || "(none)"}`,
+        `Working directory: ${ctx.cwd}`,
+        `Git repo: ${git.repo ?? "(not a repo)"}`,
+        `Git branch: ${git.branch ?? "(none)"}`,
+        `Timestamp for the log entry: ${now}`,
         "",
-        exists ? "Current document:" : "The document does not exist yet — create it from this template:",
+        requested
+          ? `The user explicitly named this task "${requested}" — use that name.`
+          : "The user did not name the task. Choose the name yourself per your instructions.",
         "",
-        "```markdown",
-        current,
-        "```",
+        "Read the transcript, then create or update the doc.",
       ].join("\n");
 
-      ctx.ui.notify(`${exists ? "Updating" : "Creating"} handoff: ${name}`, "info");
-      await pi.sendUserMessage(prompt);
+      ctx.ui.notify("Handoff agent writing task doc…", "info");
+
+      try {
+        const result = await runAgentHeadless({
+          cwd: ctx.cwd,
+          agent: "handoff",
+          task,
+          model: ctx.model ? `${ctx.model.provider}/${ctx.model.id}` : undefined,
+          thinkingLevel: ctx.thinkingLevel,
+        });
+        if (result.exitCode !== 0) {
+          ctx.ui.notify(`Handoff failed: ${result.stderr.slice(0, 300) || "unknown error"}`, "error");
+          return;
+        }
+        ctx.ui.notify(result.output.trim() || "Handoff written", "info");
+      } catch (err) {
+        ctx.ui.notify(`Handoff failed: ${err instanceof Error ? err.message : String(err)}`, "error");
+      }
     },
   });
 
   pi.registerCommand("takeover", {
-    description: "Load a task's handoff doc into this session (~/.pi/tasks/<name>.md)",
+    description: "Load a task handoff doc into context as background reading (auto-detects if unnamed)",
     getArgumentCompletions: (prefix) => completions(prefix),
     handler: async (args: string, ctx: ExtensionCommandContext) => {
-      const name = sanitize(args);
+      const requested = sanitize(args);
+      let name = requested;
+
       if (!name) {
-        ctx.ui.notify("Usage: /takeover <taskname>", "error");
-        return;
+        const git = gitInfo(ctx.cwd);
+        const ranked = rankTasks(ctx.cwd, git);
+        if (ranked.length === 0) {
+          const all = listTasks();
+          ctx.ui.notify(
+            all.length
+              ? `No task matches this directory. Name one explicitly: ${all.join(", ")}`
+              : "No task docs yet. Use /handoff to create one.",
+            "error",
+          );
+          return;
+        }
+        name = ranked[0].name;
       }
 
-      const path = taskPath(name);
+      const path = join(tasksDir(), `${name}.md`);
       if (!existsSync(path)) {
-        const avail = listTasks();
+        const all = listTasks();
         ctx.ui.notify(
-          `No handoff doc for "${name}".` + (avail.length ? ` Available: ${avail.join(", ")}` : " No tasks yet."),
+          `No handoff doc for "${name}".` + (all.length ? ` Available: ${all.join(", ")}` : " No tasks yet."),
           "error",
         );
         return;
       }
 
       const doc = readFileSync(path, "utf-8");
-      const prompt = [
-        `You are taking over task "${name}". Below is its handoff doc (${path}).`,
-        "Read the Goal, Summary, and Log. Open any files referenced in the Summary,",
-        "confirm the current state, then continue the work from where the Log left off.",
+      const content = [
+        `Handoff doc for task "${name}" (${path}), loaded as background context.`,
+        "It describes work already in progress. Do not act on it yet — wait for the",
+        "user's instruction, then use it to orient. When work does start, open the",
+        "files it references and confirm the current state before trusting it.",
         "",
         "```markdown",
         doc,
         "```",
       ].join("\n");
 
-      ctx.ui.notify(`Taking over: ${name}`, "info");
-      await pi.sendUserMessage(prompt);
+      ctx.ui.notify(`Loaded task: ${name}${requested ? "" : " (auto-detected)"}`, "info");
+      // A custom message, not a user message: takeover loads context, it does not
+      // ask for anything. `nextTurn` rides along with whatever the user types next
+      // and never triggers a turn on its own, so this is also safe mid-stream.
+      await pi.sendMessage(
+        { customType: "task-handoff", content, display: false },
+        { deliverAs: "nextTurn" },
+      );
     },
   });
 }

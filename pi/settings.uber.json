@@ -12,9 +12,9 @@
   "packages": [
     "~/devenv",
     "https://github.com/carderne/pi-nvim",
-    "https://github.com/MahammadAgayev/chorus.pi",
-    "npm:mason4agents"
+    "npm:mason4agents",
+    "npm:pi-hashline-edit-pro"
   ],
-  "lastChangelogVersion": "0.80.3",
+  "lastChangelogVersion": "0.84.3",
   "theme": "rose-pine-moon"
 }

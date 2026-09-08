@@ -200,7 +200,11 @@ const REQUIRED_ARGS: Record<string, string[]> = {
   read: ["path"],
   ffgrep: ["pattern"],
   fffind: ["pattern"],
-  edit: ["path", "edits"],
+  // `edit` is replaced by pi-hashline-edit-pro's `replace` tool. Only the two
+  // hash anchors are guarded: `path` is optional by design (auto-resolved from
+  // the anchors as a fallback), and `replacement_lines: []` is the documented
+  // way to delete a range — neither may be treated as an empty-arg error.
+  replace: ["remove_from", "remove_to"],
   write: ["path", "content"],
   Agent: ["subagent_type", "prompt"],
   agent: ["agent", "task"],

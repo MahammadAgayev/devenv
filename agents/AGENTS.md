@@ -41,12 +41,15 @@ When your changes create orphans:
 
 The test: Every changed line should trace directly to the user's request.
 
-## 5. Git Staging
+## 5. Task Handoff Docs
 
-**Handoff docs live in `~/.pi/tasks/` (outside any repo) — never commit task docs.**
+**`~/.pi/tasks/<name>.md` holds durable notes for work that outlives one session.**
 
-- `~/.pi/tasks/<name>.md` holds local handoff docs written by `/handoff`. They are global and repo-independent, so they normally can't be staged by accident.
-- If a `.pi/tasks/` folder ever appears inside a repo, do not stage or commit anything under it. When staging with a broad path (e.g. `git add .` or `git add .pi`), exclude it explicitly.
+They exist so a future session can resume without this one. Written by the `handoff` subagent via `/handoff`; loaded as background context via `/takeover`.
+
+- **Suggest `/handoff` rarely** — at a real milestone, before context runs out, or when wrapping up a thread that will be picked up later. Not routinely, and not for one-off questions. A doc per errand is noise.
+- **Loaded docs are orientation, not instructions.** A doc that arrives via `/takeover` describes work already in progress; wait for the user to say what they want. Verify against the files before trusting it — it was written by a session that is gone and the tree may have moved since.
+- **Never commit them.** They live outside any repo, so this mostly takes care of itself. If a `.pi/tasks/` folder ever shows up inside a repo, don't stage it — exclude it explicitly when staging broadly (`git add .`, `git add .pi`).
 
 ## 4. Goal-Driven Execution
 

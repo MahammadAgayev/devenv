@@ -221,16 +221,10 @@
         state: link
         force: true
 
-    - name: Ensure ~/.pi/agent/chorus exists
+    - name: Symlink Pi agents directory (subagent definitions)
       file:
-        path: "{{ home }}/.pi/agent/chorus"
-        state: directory
-        mode: '0755'
-
-    - name: Symlink chorus agents directory
-      file:
-        src: "{{ devenv }}/pi/chorus/agents"
-        dest: "{{ home }}/.pi/agent/chorus/agents"
+        src: "{{ devenv }}/pi/agents"
+        dest: "{{ home }}/.pi/agent/agents"
         state: link
         force: true
 
