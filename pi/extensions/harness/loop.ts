@@ -30,7 +30,7 @@ import type {
 import { spawn } from "node:child_process";
 import { CONFIG } from "./config.ts";
 import { setActiveRun } from "./control.ts";
-import { evaluate, runValidation } from "./oracle.ts";
+import { evaluate, runValidation, type EvaluatorVerdict } from "./oracle.ts";
 import { finalNotePrompt, iterationPrompt, resetSeed } from "./prompts.ts";
 import {
   appendLog,
@@ -42,6 +42,7 @@ import {
   takeSteer,
   writeState,
   type HarnessState,
+  type Verdict,
 } from "./state.ts";
 
 /** Why a run stopped. Recorded in state and used for the closing note. */
@@ -132,14 +133,6 @@ function commitBackstop(cwd: string, message: string): void {
   })();
 }
 
-/** Percent of context used, or null when pi cannot say yet. */
-function contextPercent(ctx: LoopContext): number | null {
-  try {
-    return ctx.getContextUsage()?.percent ?? null;
-  } catch {
-    return null;
-  }
-}
 
 function recordSession(state: HarnessState, ctx: LoopContext): void {
   let file: string | undefined;
@@ -190,7 +183,248 @@ async function finishRun(
 }
 
 /**
+ * Abandon a run without a closing note.
+ *
+ * Distinct from `finishRun`: this is for the case where we could not talk to the
+ * agent at all, so asking it for a summary is pointless. The failure goes to the
+ * UI and not just log.md, because the symptom — `/harness start` appearing to do
+ * nothing — is otherwise invisible.
+ */
+function abortRun(ctx: LoopContext, state: HarnessState, message: string): void {
+  appendLog(state.name, `send failed: ${message}`);
+  state.status = "failed";
+  writeState(state);
+  setActiveRun(null);
+  ctx.ui.notify(`harness "${state.name}": could not send the iteration prompt — ${message}`, "error");
+}
+
+/**
+ * Should the run stop before spending another turn?
+ *
+ * Checked at the top of every iteration and again after the oracle, so a stop
+ * requested mid-turn is honoured at the next boundary rather than after another
+ * full turn's worth of tokens.
+ */
+function haltReason(state: HarnessState): { reason: EndReason; status: HarnessState["status"] } | null {
+  if (stopRequested(state.name)) return { reason: "stopped by user", status: "stopped" };
+  if (state.iteration >= CONFIG.maxIterations) {
+    return { reason: "hit the iteration limit", status: "failed" };
+  }
+  return null;
+}
+
+/**
+ * Assemble this iteration's prompt and send it.
+ *
+ * Returns null on success, or the error message if the send failed — usually the
+ * session going away underneath us (reload, shutdown, a manual `/new`), which is
+ * not recoverable but is also not alarming.
+ *
+ * Consuming `STEER.md` is part of sending rather than a separate step: the steer
+ * is destroyed by reading it, so it must not be taken until the prompt that
+ * carries it is actually being built.
+ */
+async function sendIterationPrompt(
+  pi: ExtensionAPI,
+  ctx: LoopContext,
+  state: HarnessState,
+  opts: { findings?: string; freshSession: boolean },
+): Promise<string | null> {
+  const steer = takeSteer(state.name);
+  if (steer) appendLog(state.name, `steer consumed: ${steer.slice(0, 120)}`);
+
+  const prompt = iterationPrompt({
+    state,
+    task: readTask(state.name),
+    runDir: runDir(state.name),
+    evaluatorFindings: opts.findings,
+    steer: steer ?? undefined,
+    freshSession: opts.freshSession,
+  });
+
+  try {
+    await sendPrompt(pi, ctx, prompt);
+    return null;
+  } catch (err) {
+    return err instanceof Error ? err.message : String(err);
+  }
+}
+
+/**
+ * Pick the state back up after a turn and count the iteration.
+ *
+ * Re-read rather than reused: the agent may have edited state.json during its
+ * turn, and an in-memory copy captured before the turn would clobber those
+ * edits — including its own log of what it did.
+ */
+function reloadAfterTurn(state: HarnessState): HarnessState {
+  const current = readState(state.name) ?? state;
+  current.iteration += 1;
+  return current;
+}
+
+/** What the oracle concluded this iteration. */
+interface OracleReading {
+  verdict: Verdict;
+  /** Exit code of the validation command, or null when it could not run. */
+  exitCode: number | null;
+  /** Set only when the evaluator actually ran this iteration. */
+  evaluatorVerdict?: EvaluatorVerdict;
+  /** The evaluator's complaint, to be fed into the next prompt. Set only on NEEDS_WORK. */
+  findings?: string;
+  /** Both layers agree the work is finished. */
+  done: boolean;
+}
+
+/**
+ * Run the validation command, and the evaluator if it passed.
+ *
+ * Mutates and persists `state`: the verdict, the clipped output, and the history
+ * entry all belong to the iteration that just ended, and a crash between here
+ * and the next write should not lose them.
+ *
+ * The evaluator only runs behind a passing command, which is what keeps it
+ * affordable — the expensive judgement is asked for once, at the point where the
+ * cheap one says we might be done.
+ */
+async function consultOracle(ctx: LoopContext, state: HarnessState): Promise<OracleReading> {
+  const validation = await runValidation(state.validationCommand, state.cwd, ctx.signal);
+  state.lastVerdict = validation.verdict;
+  state.lastOutput = validation.output;
+
+  let evaluatorVerdict: EvaluatorVerdict | undefined;
+  let findings: string | undefined;
+
+  if (validation.verdict === "PASS" && CONFIG.useEvaluator) {
+    ctx.ui.notify(`harness "${state.name}": validation passed — reviewing`, "info");
+    const evaluation = await evaluate({
+      cwd: state.cwd,
+      task: readTask(state.name),
+      validationCommand: state.validationCommand,
+      validationOutput: validation.output,
+      model: ctx.model ? `${ctx.model.provider}/${ctx.model.id}` : undefined,
+      signal: ctx.signal,
+    });
+    evaluatorVerdict = evaluation.verdict;
+    if (evaluation.verdict === "NEEDS_WORK") {
+      findings = evaluation.findings;
+      appendLog(state.name, `reviewer returned NEEDS_WORK: ${evaluation.findings.slice(0, 200)}`);
+    }
+  }
+
+    exitCode: validation.exitCode,
+    evaluatorVerdict,
+    findings,
+    done: validation.verdict === "PASS" && (!CONFIG.useEvaluator || evaluatorVerdict === "PASS"),
+  };
+}
+
+/**
+ * Append the iteration to the history and take the commit snapshot.
+ *
+ * Separate from `consultOracle` so the caller can decline to record: an
+ * iteration killed by a third unrunnable validation command measured nothing,
+ * and gets neither a history row nor a snapshot. Reading the oracle and writing
+ * down what it said are also just different jobs — one talks to the outside
+ * world, the other only touches `state`.
+ */
+function recordIteration(state: HarnessState, reading: OracleReading): void {
+  state.history.push({
+    iteration: state.iteration,
+    verdict: reading.verdict,
+    exitCode: reading.exitCode,
+    ...(reading.evaluatorVerdict ? { evaluator: reading.evaluatorVerdict } : {}),
+    timestamp: new Date().toISOString(),
+  });
+  writeState(state);
+
+  if (CONFIG.commitEachIteration) {
+    commitBackstop(state.cwd, `harness(${state.name}): iteration ${state.iteration} [${reading.verdict}]`);
+  }
+}
+
+/**
+ * How much of the context window is gone, or null when pi cannot say yet.
+ *
+ * Returns null rather than 0 for "unknown", so an unavailable reading never
+ * looks like an empty context and never triggers or suppresses a reset.
+ */
+function contextPercent(ctx: LoopContext): number | null {
+  try {
+    return ctx.getContextUsage()?.percent ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** What `attemptReset` decided. */
+type ResetOutcome =
+  /** A fresh session took over; this frame has nothing left to do. */
+  | { kind: "handedOff" }
+  /** The reset did not happen and the run is over for the given reason. */
+  | { kind: "end"; reason: EndReason; status: HarnessState["status"] };
+
+/**
+ * Swap in a fresh session and continue the run inside it.
+ *
+ * The recursion is the awkward part, so to be explicit about what happens:
+ * `newSession()` tears down this extension instance and builds a new one, then
+ * calls `withSession` with a context bound to the replacement. `runLoop` is
+ * re-entered there and runs the *rest of the run* to completion inside that
+ * call — so by the time `newSession()` returns, the run has already ended.
+ * There is nothing sensible for this frame to do afterwards, which is why the
+ * caller returns immediately on `handedOff` rather than looping.
+ *
+ * Depth therefore equals the number of resets, bounded by `CONFIG.maxResets`.
+ *
+ * Only strings cross the boundary. `state` and `ctx` are stale the moment the
+ * replacement happens, so the far side re-reads everything from disk; the one
+ * exception is the cancelled path, where the swap did not occur and this frame's
+ * `ctx` is therefore still the live one.
+ */
+async function attemptReset(
+  pi: ExtensionAPI,
+  ctx: LoopContext,
+  state: HarnessState,
+  percent: number,
+): Promise<ResetOutcome> {
+  if (state.sessionChain.length >= CONFIG.maxResets) {
+    return { kind: "end", reason: "hit the reset limit", status: "failed" };
+  }
+
+  const runName = state.name;
+  const seed = resetSeed(state, runDir(runName));
+  const rounded = Math.round(percent);
+
+  appendLog(runName, `context at ${rounded}% — resetting session`);
+  ctx.ui.notify(`harness "${runName}": context ${rounded}% — starting fresh session`, "info");
+  writeState(state);
+
+  const result = await ctx.newSession({
+    withSession: async (fresh) => {
+      // `fresh` is the only valid context from here on. The `ctx` in scope is
+      // now stale and must not be touched again on this path.
+      await fresh.sendUserMessage(seed);
+      await fresh.waitForIdle();
+      await runLoop(pi, fresh, runName, true);
+    },
+  });
+
+  if (result.cancelled) {
+    appendLog(runName, "session reset was cancelled — ending run");
+    return { kind: "end", reason: "interrupted", status: "idle" };
+  }
+  return { kind: "handedOff" };
+}
+
+/**
  * Run iterations until something ends the run.
+ *
+ * The body is deliberately just the sequence — halt, send, wait, measure, decide
+ * — with each step's detail behind a named helper above. Everything that must
+ * survive a session reset lives in `state.json`; the three locals here are the
+ * only loop-carried values, and all three are re-derived after a reset because
+ * the fresh session re-enters this function from the top.
  *
  * `freshSession` is true on the first call and on the first iteration after
  * every reset; it switches the prompt into "you have no memory, read the log"
@@ -226,151 +460,64 @@ export async function runLoop(
   let consecutiveErrors = 0;
 
   for (;;) {
-    // ── Stop checks, before spending a turn ──────────────────────────────
-    if (stopRequested(name)) {
-      await finishRun(pi, ctx, state, "stopped by user", "stopped");
-      return;
-    }
-    if (state.iteration >= CONFIG.maxIterations) {
-      await finishRun(pi, ctx, state, "hit the iteration limit", "failed");
+    const halt = haltReason(state);
+    if (halt) {
+      await finishRun(pi, ctx, state, halt.reason, halt.status);
       return;
     }
 
-    // ── Send the iteration prompt ────────────────────────────────────────
-    const steer = takeSteer(name);
-    if (steer) appendLog(name, `steer consumed: ${steer.slice(0, 120)}`);
-
-    const prompt = iterationPrompt({
-      state,
-      task: readTask(name),
-      runDir: runDir(name),
-      evaluatorFindings: pendingFindings,
-      steer: steer ?? undefined,
+    const sendError = await sendIterationPrompt(pi, ctx, state, {
+      findings: pendingFindings,
       freshSession: isFresh,
     });
     pendingFindings = undefined;
     isFresh = false;
-
-    try {
-      await sendPrompt(pi, ctx, prompt);
-    } catch (err) {
-      // Usually the session going away underneath us (reload, shutdown, manual
-      // /new), which is not recoverable but is also not alarming.
-      //
-      // It is surfaced in the UI rather than only appended to log.md because
-      // the first version of this loop swallowed a TypeError here — sending on
-      // a context that has no `sendUserMessage` — and `/harness start` did
-      // nothing at all, with no visible reason. A run that cannot send its
-      // first prompt has failed; say so where the user is looking.
-      const message = err instanceof Error ? err.message : String(err);
-      appendLog(name, `send failed: ${message}`);
-      state.status = "failed";
-      writeState(state);
-      setActiveRun(null);
-      ctx.ui.notify(`harness "${name}": could not send the iteration prompt — ${message}`, "error");
+    if (sendError !== null) {
+      abortRun(ctx, state, sendError);
       return;
     }
 
     await waitForTurn(ctx);
+    state = reloadAfterTurn(state);
 
-    // Re-read: the agent may have edited state.json, and the iteration counter
-    // must not be clobbered by a stale in-memory copy.
-    state = readState(name) ?? state;
-    state.iteration += 1;
-
-    // ── Consult the oracle ───────────────────────────────────────────────
-    const validation = await runValidation(state.validationCommand, state.cwd, ctx.signal);
-    state.lastVerdict = validation.verdict;
-    state.lastOutput = validation.output;
+    const reading = await consultOracle(ctx, state);
+    pendingFindings = reading.findings;
 
     // Three strikes on a command that will not even execute. The agent has had
     // three iterations with an explicit "fix the oracle first" prompt; if it
     // still cannot run, something outside its reach is wrong.
-    consecutiveErrors = validation.verdict === "ERROR" ? consecutiveErrors + 1 : 0;
+    //
+    // Checked before recording: an iteration that measured nothing earns no
+    // history entry and no snapshot, so a broken oracle does not pad the run's
+    // record with three identical ERROR rows.
+    consecutiveErrors = reading.verdict === "ERROR" ? consecutiveErrors + 1 : 0;
     if (consecutiveErrors >= 3) {
       writeState(state);
       await finishRun(pi, ctx, state, "the validation command is broken", "failed");
       return;
     }
 
-    let evaluatorVerdict: "PASS" | "NEEDS_WORK" | undefined;
+    recordIteration(state, reading);
 
-    if (validation.verdict === "PASS" && CONFIG.useEvaluator) {
-      ctx.ui.notify(`harness "${name}": validation passed — reviewing`, "info");
-      const evaluation = await evaluate({
-        cwd: state.cwd,
-        task: readTask(name),
-        validationCommand: state.validationCommand,
-        validationOutput: validation.output,
-        model: ctx.model ? `${ctx.model.provider}/${ctx.model.id}` : undefined,
-        signal: ctx.signal,
-      });
-      evaluatorVerdict = evaluation.verdict;
-      if (evaluation.verdict === "NEEDS_WORK") {
-        pendingFindings = evaluation.findings;
-        appendLog(name, `reviewer returned NEEDS_WORK: ${evaluation.findings.slice(0, 200)}`);
-      }
-    }
-
-    state.history.push({
-      iteration: state.iteration,
-      verdict: validation.verdict,
-      exitCode: validation.exitCode,
-      ...(evaluatorVerdict ? { evaluator: evaluatorVerdict } : {}),
-      timestamp: new Date().toISOString(),
-    });
-    writeState(state);
-
-    if (CONFIG.commitEachIteration) {
-      commitBackstop(state.cwd, `harness(${name}): iteration ${state.iteration} [${validation.verdict}]`);
-    }
-
-    // ── Done? ────────────────────────────────────────────────────────────
-    const done = validation.verdict === "PASS" && (!CONFIG.useEvaluator || evaluatorVerdict === "PASS");
-    if (done) {
+    if (reading.done) {
       await finishRun(pi, ctx, state, "validation passed and review confirmed it", "done");
       return;
     }
 
+    // Checked again here because the turn we just spent is the long part of an
+    // iteration; a stop arriving during it should not cost another one.
     if (stopRequested(name)) {
       await finishRun(pi, ctx, state, "stopped by user", "stopped");
       return;
     }
 
-    // ── Reset the context if it is filling up ────────────────────────────
     const percent = contextPercent(ctx);
     if (percent !== null && percent >= CONFIG.resetThresholdPercent) {
-      const resets = state.sessionChain.length;
-      if (resets >= CONFIG.maxResets) {
-        await finishRun(pi, ctx, state, "hit the reset limit", "failed");
-        return;
+      const outcome = await attemptReset(pi, ctx, state, percent);
+      if (outcome.kind === "end") {
+        await finishRun(pi, ctx, state, outcome.reason, outcome.status);
       }
-
-      // Only plain strings cross this boundary. Everything else is re-read
-      // from disk on the other side by the recursive runLoop call.
-      const runName = state.name;
-      const seed = resetSeed(state, runDir(runName));
-
-      appendLog(runName, `context at ${Math.round(percent)}% — resetting session`);
-      ctx.ui.notify(`harness "${runName}": context ${Math.round(percent)}% — starting fresh session`, "info");
-      writeState(state);
-
-      const result = await ctx.newSession({
-        withSession: async (fresh) => {
-          // `fresh` is the only valid context from here on. The `ctx` in scope
-          // is now stale and must not be touched again on this path.
-          await fresh.sendUserMessage(seed);
-          await fresh.waitForIdle();
-          await runLoop(pi, fresh, runName, true);
-        },
-      });
-
-      if (result.cancelled) {
-        appendLog(runName, "session reset was cancelled — ending run");
-        // `ctx` is still valid precisely because the replacement did not happen.
-        await finishRun(pi, ctx, state, "interrupted", "idle");
-      }
-      // The recursive call owns the run now. This frame is done either way.
+      // Either the recursive call owns the run now, or we just closed it out.
       return;
     }
   }
