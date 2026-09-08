@@ -1,66 +1,62 @@
-# Plan Mode Extension
+# Plan Mode
 
-Read-only exploration mode for safe code analysis.
+Read-only exploration and design. Toggle with `/plan` or `Ctrl+Alt+P`, or start
+a session in it with `--plan`.
 
-## Features
+While plan mode is on, the agent can read, search, and run read-only commands,
+but cannot change anything. It investigates first, asks you about the decisions
+it genuinely can't resolve alone, and writes a plan. You then choose whether to
+build it.
 
-- **Built-in write tools disabled**: Disables edit/write while preserving other active tools
-- **Bash allowlist**: Only read-only bash commands are allowed
-- **Plan extraction**: Extracts numbered steps from `Plan:` sections
-- **Progress tracking**: Widget shows completion status during execution
-- **[DONE:n] markers**: Explicit step completion tracking
-- **Session persistence**: State survives session resume
+## The question tool
 
-## Commands
-
-- `/plan` - Toggle plan mode
-- `/todos` - Show current plan progress
-- `Ctrl+Alt+P` - Toggle plan mode (shortcut)
-
-## Usage
-
-1. Enable plan mode with `/plan` or `--plan` flag
-2. Ask the agent to analyze code and create a plan
-3. The agent should output a numbered plan under a `Plan:` header:
+Plan mode registers `plan_question`, which renders a real options UI:
 
 ```
-Plan:
-1. First step description
-2. Second step description
-3. Third step description
+────────────────────────────────────────────────────
+ Should the retry live in the client or the caller?
+
+ ❯ 1. Client
+      One place to change; every caller inherits it.
+   2. Caller
+      Explicit per call site, but easy to forget.
+   3. Something else…
+
+ ↑↓ navigate • Enter to select • Esc to cancel
+────────────────────────────────────────────────────
 ```
 
-4. Choose "Execute the plan" when prompted
-5. During execution, the agent marks steps complete with `[DONE:n]` tags
-6. Progress widget shows completion status
+`↑↓` to move, `Enter` to pick, `Esc` to dismiss. "Something else…" opens an
+inline editor for a free-form answer; `Esc` there goes back to the list.
 
-## How It Works
+The prompt tells the agent to ask **one question at a time** and to look up
+facts rather than asking — only real decisions reach you, and each answer shapes
+what it asks next.
 
-### Plan Mode (Read-Only)
-- Built-in edit/write tools disabled
-- Other active tools remain available
-- Bash commands filtered through allowlist
-- Agent creates a plan without making changes
+Adapted from pi's own `examples/extensions/question.ts`.
 
-### Execution Mode
-- Full tool access restored
-- Agent executes steps in order
-- `[DONE:n]` markers track completion
-- Widget shows progress
+## Finishing
 
-### Command Allowlist
+The agent ends a finished plan with `[PLAN READY]`, which triggers a menu:
 
-Safe commands (allowed):
-- File inspection: `cat`, `head`, `tail`, `less`, `more`
-- Search: `grep`, `find`, `rg`, `fd`
-- Directory: `ls`, `pwd`, `tree`
-- Git read: `git status`, `git log`, `git diff`, `git branch`
-- Package info: `npm list`, `npm outdated`, `yarn info`
-- System info: `uname`, `whoami`, `date`, `uptime`
+- **Build it** — leaves plan mode, restores tools, starts implementing.
+- **Keep planning** — stays in plan mode to refine.
+- **Exit plan mode, don't build** — leaves plan mode without doing the work.
 
-Blocked commands:
-- File modification: `rm`, `mv`, `cp`, `mkdir`, `touch`
-- Git write: `git add`, `git commit`, `git push`
-- Package install: `npm install`, `yarn add`, `pip install`
-- System: `sudo`, `kill`, `reboot`
-- Editors: `vim`, `nano`, `code`
+The marker is why the menu doesn't appear after every exploratory turn: the
+model decides when the plan is done, not the turn boundary.
+
+## What's blocked
+
+Disabled tools: `edit`, `write`, `replace`, `undo_last_replace`. Every other
+active tool stays available; the snapshot taken on entry is restored on exit.
+
+Bash is filtered through the `isSafeCommand` allowlist in `utils.ts` — the same
+one behind the `readonly_bash` tool. Reads, searches, and `git log`/`status`/`diff`
+pass; anything that writes, installs, or kills does not.
+
+Enforcement is in two layers: the tools are deactivated, and `tool_call` also
+blocks them, so a model working from a stale tool list gets a clear reason
+rather than a silent failure.
+
+State persists across `/resume`.

@@ -245,22 +245,22 @@ export default function (pi: ExtensionAPI) {
 
       ctx.ui.notify("Handoff agent writing task doc…", "info");
 
-      try {
-        const result = await runAgentHeadless({
-          cwd: ctx.cwd,
-          agent: "handoff",
-          task,
-          model: ctx.model ? `${ctx.model.provider}/${ctx.model.id}` : undefined,
-          thinkingLevel: ctx.thinkingLevel,
-        });
-        if (result.exitCode !== 0) {
-          ctx.ui.notify(`Handoff failed: ${result.stderr.slice(0, 300) || "unknown error"}`, "error");
-          return;
-        }
-        ctx.ui.notify(result.output.trim() || "Handoff written", "info");
-      } catch (err) {
-        ctx.ui.notify(`Handoff failed: ${err instanceof Error ? err.message : String(err)}`, "error");
+      const result = await runAgentHeadless({
+        cwd: ctx.cwd,
+        agent: "handoff",
+        task,
+        model: ctx.model ? `${ctx.model.provider}/${ctx.model.id}` : undefined,
+        thinkingLevel: ctx.thinkingLevel,
+      });
+
+      // A non-zero exit is the subagent reporting failure, not an exception, so
+      // it has to be surfaced explicitly. Anything that actually throws is left
+      // to propagate.
+      if (result.exitCode !== 0) {
+        ctx.ui.notify(`Handoff failed: ${result.stderr.slice(0, 300) || "unknown error"}`, "error");
+        return;
       }
+      ctx.ui.notify(result.output.trim() || "Handoff written", "info");
     },
   });
 
