@@ -28,6 +28,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSy
 import { homedir, tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { runAgentHeadless } from "./agents/index.ts";
+import { renderTranscript } from "./lib/transcript.ts";
 
 // Tasks live under the global agent config dir (~/.pi/tasks), not per-repo, so
 // handoffs survive across repos and never land inside a git working tree.
@@ -77,87 +78,6 @@ function gitInfo(cwd: string): { branch?: string; repo?: string } {
     branch: run("rev-parse", "--abbrev-ref", "HEAD"),
     repo: root ? basename(root) : undefined,
   };
-}
-
-// Long tool results are the bulk of a transcript and the least of its meaning,
-// so they get clipped hard. Assistant prose is where the decisions live.
-const TOOL_RESULT_CLIP = 600;
-const TEXT_CLIP = 4000;
-
-function clip(text: string, max: number): string {
-  return text.length <= max ? text : `${text.slice(0, max)}\n… [${text.length - max} more chars]`;
-}
-
-function partsToText(content: unknown): string {
-  if (typeof content === "string") return content;
-  if (!Array.isArray(content)) return "";
-  return content
-    .map((part: any) => {
-      if (part?.type === "text") return part.text ?? "";
-      if (part?.type === "image") return "[image]";
-      return "";
-    })
-    .filter(Boolean)
-    .join("\n");
-}
-
-/**
- * Render the active branch as markdown for the handoff agent.
- *
- * Uses `buildContextEntries()` rather than `getEntries()`: it follows the live
- * branch and honours compaction, so the subagent sees what this session actually
- * has in context — not abandoned branches or pre-compaction history.
- */
-function dumpTranscript(ctx: ExtensionCommandContext): string {
-  const entries = ctx.sessionManager.buildContextEntries();
-  const out: string[] = [];
-
-  for (const entry of entries as any[]) {
-    const msg = entry?.message;
-    if (!msg) continue;
-
-    switch (msg.role) {
-      case "user":
-        out.push(`## User\n\n${clip(partsToText(msg.content), TEXT_CLIP)}`);
-        break;
-
-      case "assistant": {
-        const text = msg.content
-          .filter((p: any) => p.type === "text")
-          .map((p: any) => p.text)
-          .join("\n");
-        const calls = msg.content
-          .filter((p: any) => p.type === "toolCall")
-          .map((p: any) => `- \`${p.name}\` ${clip(JSON.stringify(p.arguments ?? {}), 300)}`);
-        const body = [text && clip(text, TEXT_CLIP), calls.length ? `Tool calls:\n${calls.join("\n")}` : ""]
-          .filter(Boolean)
-          .join("\n\n");
-        if (body) out.push(`## Assistant\n\n${body}`);
-        break;
-      }
-
-      case "toolResult":
-        out.push(
-          `## Tool result (${msg.toolName}${msg.isError ? ", ERROR" : ""})\n\n` +
-            clip(partsToText(msg.content), TOOL_RESULT_CLIP),
-        );
-        break;
-
-      case "bashExecution":
-        out.push(`## Shell\n\n\`${msg.command}\` → exit ${msg.exitCode}\n\n${clip(msg.output ?? "", TOOL_RESULT_CLIP)}`);
-        break;
-
-      case "compactionSummary":
-        out.push(`## [earlier context, compacted]\n\n${msg.summary}`);
-        break;
-
-      case "branchSummary":
-        out.push(`## [abandoned branch, summarized]\n\n${msg.summary}`);
-        break;
-    }
-  }
-
-  return out.join("\n\n---\n\n");
 }
 
 /**
@@ -214,7 +134,7 @@ export default function (pi: ExtensionAPI) {
         await ctx.waitForIdle();
       }
 
-      const transcript = dumpTranscript(ctx);
+      const transcript = renderTranscript(ctx.sessionManager);
       if (!transcript.trim()) {
         ctx.ui.notify("Nothing to hand off — this session is empty", "error");
         return;

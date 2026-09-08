@@ -3,10 +3,13 @@
  *
  * `status` reads state.json and is free, but it cannot answer "what is it
  * doing"; that needs the transcript. Reading a transcript into the live session
- * is the one thing a long-running harness must not do, so this copies
- * `/handoff` (`extensions/task-handoff.ts`): dump the transcript to a temp
- * file, hand the path to a headless subagent, print the one line it returns.
- * The isolation comes from the subagent's own context window.
+ * is the one thing a long-running harness must not do, so this takes the same
+ * route as `/handoff` (`extensions/task-handoff.ts`): render the transcript to
+ * a temp file, hand the path to a headless subagent, print the one line it
+ * returns. The isolation comes from the subagent's own context window.
+ *
+ * The rendering itself is shared with `/handoff` via `lib/transcript.ts` — the
+ * two used to hold verbatim copies of it.
  *
  * Note this is deliberately *not* `ctx.fork()`. Forking replaces the live
  * session, which is the opposite of what is wanted — the run must continue
@@ -22,6 +25,7 @@ import type { ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
 import { writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { renderTranscript } from "../lib/transcript.ts";
 import { readState, runDir } from "./state.ts";
 
 /**
@@ -34,90 +38,6 @@ import { readState, runDir } from "./state.ts";
 async function loadRunAgentHeadless() {
   const mod = await import("../agents/index.ts");
   return mod.runAgentHeadless;
-}
-
-// Same clips as task-handoff.ts: tool results are the bulk of a transcript and
-// the least of its meaning; assistant prose is where the decisions live.
-const TOOL_RESULT_CLIP = 600;
-const TEXT_CLIP = 4000;
-
-function clip(text: string, max: number): string {
-  return text.length <= max ? text : `${text.slice(0, max)}\n… [${text.length - max} more chars]`;
-}
-
-function partsToText(content: unknown): string {
-  if (typeof content === "string") return content;
-  if (!Array.isArray(content)) return "";
-  return content
-    .map((part: any) => {
-      if (part?.type === "text") return part.text ?? "";
-      if (part?.type === "image") return "[image]";
-      return "";
-    })
-    .filter(Boolean)
-    .join("\n");
-}
-
-/**
- * Render the active branch as markdown.
- *
- * `buildContextEntries()` rather than `getEntries()`: it follows the live
- * branch and honours compaction, so the subagent sees what this session
- * actually has in context rather than abandoned branches or pre-compaction
- * history.
- */
-function dumpTranscript(ctx: ExtensionCommandContext): string {
-  const entries = ctx.sessionManager.buildContextEntries();
-  const out: string[] = [];
-
-  for (const entry of entries as any[]) {
-    const msg = entry?.message;
-    if (!msg) continue;
-
-    switch (msg.role) {
-      case "user":
-        out.push(`## User\n\n${clip(partsToText(msg.content), TEXT_CLIP)}`);
-        break;
-
-      case "assistant": {
-        const text = msg.content
-          .filter((p: any) => p.type === "text")
-          .map((p: any) => p.text)
-          .join("\n");
-        const calls = msg.content
-          .filter((p: any) => p.type === "toolCall")
-          .map((p: any) => `- \`${p.name}\` ${clip(JSON.stringify(p.arguments ?? {}), 300)}`);
-        const body = [text && clip(text, TEXT_CLIP), calls.length ? `Tool calls:\n${calls.join("\n")}` : ""]
-          .filter(Boolean)
-          .join("\n\n");
-        if (body) out.push(`## Assistant\n\n${body}`);
-        break;
-      }
-
-      case "toolResult":
-        out.push(
-          `## Tool result (${msg.toolName}${msg.isError ? ", ERROR" : ""})\n\n` +
-            clip(partsToText(msg.content), TOOL_RESULT_CLIP),
-        );
-        break;
-
-      case "bashExecution":
-        out.push(
-          `## Shell\n\n\`${msg.command}\` → exit ${msg.exitCode}\n\n${clip(msg.output ?? "", TOOL_RESULT_CLIP)}`,
-        );
-        break;
-
-      case "compactionSummary":
-        out.push(`## [earlier context, compacted]\n\n${msg.summary}`);
-        break;
-
-      case "branchSummary":
-        out.push(`## [abandoned branch, summarized]\n\n${msg.summary}`);
-        break;
-    }
-  }
-
-  return out.join("\n\n---\n\n");
 }
 
 /**
@@ -165,7 +85,7 @@ export async function recap(ctx: ExtensionCommandContext, name: string): Promise
     await ctx.waitForIdle();
   }
 
-  const transcript = dumpTranscript(ctx);
+  const transcript = renderTranscript(ctx.sessionManager);
   if (!transcript.trim()) {
     ctx.ui.notify("Nothing to recap — this session is empty", "error");
     return;
