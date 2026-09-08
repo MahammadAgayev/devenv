@@ -27,6 +27,7 @@ import { runValidation } from "./oracle.ts";
 import { recap } from "./recap.ts";
 import {
   createRun,
+  describeReadFailure,
   listRuns,
   readState,
   requestStop,
@@ -107,7 +108,7 @@ function completions(prefix: string): AutocompleteItem[] | null {
 /** Deterministic one-liner. No LLM call, instant, correct by construction. */
 function formatStatus(name: string): string {
   const state = readState(name);
-  if (!state) return `harness: no run named "${name}"`;
+  if (!state) return describeReadFailure(name);
 
   const bits = [
     `harness "${name}"`,
@@ -215,7 +216,7 @@ export default function (pi: ExtensionAPI) {
 
           const state = readState(name);
           if (!state) {
-            ctx.ui.notify(`harness: run "${name}" has no readable state.json`, "error");
+            ctx.ui.notify(describeReadFailure(name), "error");
             return;
           }
 

@@ -165,12 +165,39 @@ export function runExists(name: string): boolean {
   return existsSync(statePath(name));
 }
 
+/**
+ * Read a run's state, or null if it cannot be had.
+ *
+ * Null-returning rather than throwing because every caller has a sensible
+ * "then there is no run" path, and none of them can do anything useful with an
+ * exception in the middle of a loop iteration.
+ *
+ * It does mean the two failures — no such run, and a run whose state.json is
+ * damaged — arrive here as the same value. Callers that report to the user
+ * should say which, via `describeReadFailure`.
+ */
 export function readState(name: string): HarnessState | null {
   try {
     return JSON.parse(readFileSync(statePath(name), "utf-8")) as HarnessState;
   } catch {
     return null;
   }
+}
+
+/**
+ * A user-facing sentence explaining why `readState(name)` came back empty.
+ *
+ * The distinction is worth the extra stat: "no run named X" is a typo, while "X
+ * is unreadable" is a run that still exists, whose folder is worth opening.
+ * Reported as one message, the second case sent people hunting for a run that
+ * was sitting right there with a truncated state.json.
+ *
+ * Derived from the filesystem rather than remembered from the failed read, so
+ * it has no ordering requirement and no state to go stale.
+ */
+export function describeReadFailure(name: string): string {
+  if (!existsSync(statePath(name))) return `harness: no run named "${name}"`;
+  return `harness: run "${name}" has an unreadable state.json — see ${runDir(name)}`;
 }
 
 /**

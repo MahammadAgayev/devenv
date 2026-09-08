@@ -35,6 +35,7 @@ import { finalNotePrompt, iterationPrompt, resetSeed } from "./prompts.ts";
 import {
   appendLog,
   clearStop,
+  describeReadFailure,
   readState,
   readTask,
   runDir,
@@ -442,7 +443,7 @@ export async function runLoop(
   // bugs this design exists to avoid.
   let state = readState(name);
   if (!state) {
-    ctx.ui.notify(`harness: run "${name}" has no state.json — cannot continue`, "error");
+    ctx.ui.notify(`${describeReadFailure(name)} — cannot continue`, "error");
     setActiveRun(null);
     return;
   }

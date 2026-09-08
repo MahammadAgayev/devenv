@@ -26,7 +26,7 @@ import { writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { renderTranscript } from "../lib/transcript.ts";
-import { readState, runDir } from "./state.ts";
+import { describeReadFailure, readState, runDir } from "./state.ts";
 
 /**
  * Load `runAgentHeadless` on demand — see the same helper in `oracle.ts`.
@@ -74,7 +74,7 @@ export function truncateToSentences(text: string, max: number): string {
 export async function recap(ctx: ExtensionCommandContext, name: string): Promise<void> {
   const state = readState(name);
   if (!state) {
-    ctx.ui.notify(`harness: no run named "${name}"`, "error");
+    ctx.ui.notify(describeReadFailure(name), "error");
     return;
   }
 

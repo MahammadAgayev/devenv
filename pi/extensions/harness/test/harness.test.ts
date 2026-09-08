@@ -252,4 +252,26 @@ describe("state round-trip", () => {
     assert.equal(st.readState("nope"), null);
     assert.equal(st.runExists("nope"), false);
   });
+
+  it("tells a missing run apart from a damaged one", async () => {
+    // Both come back as null from readState, but they mean opposite things to
+    // the user: one is a typo, the other is a run that exists and is broken.
+    // Reported identically, the second sent people looking for a run that was
+    // sitting right there.
+    process.env.HOME = fakeHome;
+    const st = await import("../state.ts");
+    const { writeFileSync, mkdirSync } = await import("node:fs");
+
+    assert.match(st.describeReadFailure("nope"), /no run named "nope"/);
+
+    mkdirSync(st.runDir("damaged"), { recursive: true });
+    writeFileSync(st.statePath("damaged"), "{ truncated");
+
+    assert.equal(st.readState("damaged"), null, "unparseable JSON still reads as null");
+    const message = st.describeReadFailure("damaged");
+    assert.match(message, /unreadable state\.json/);
+    assert.doesNotMatch(message, /no run named/);
+    // The folder is where the user has to go to fix it, so it must be named.
+    assert.ok(message.includes(st.runDir("damaged")), message);
+  });
 });
