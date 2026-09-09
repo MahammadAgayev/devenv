@@ -47,6 +47,18 @@ import { join } from "node:path";
  */
 const CONFIG_DIR_NAME = ".pi";
 
+/**
+ * What the oracle said about an iteration.
+ *
+ *   PASS    the reviewer judged the work finished
+ *   FAIL    the reviewer returned NEEDS_WORK — a real reading, keep going
+ *   ERROR   the reviewer could not be run at all, so nothing was measured
+ *   UNKNOWN no iteration has been judged yet
+ *
+ * FAIL and ERROR are kept apart because they call for opposite responses:
+ * iterating on FAIL is the point, iterating on ERROR burns tokens producing no
+ * signal.
+ */
 export type Verdict = "PASS" | "FAIL" | "ERROR" | "UNKNOWN";
 
 export type RunStatus = "idle" | "running" | "done" | "stopped" | "failed";
@@ -54,10 +66,6 @@ export type RunStatus = "idle" | "running" | "done" | "stopped" | "failed";
 export interface IterationRecord {
   iteration: number;
   verdict: Verdict;
-  /** Exit code of the validation command, or null when it could not run. */
-  exitCode: number | null;
-  /** Evaluator verdict, when the evaluator ran this iteration. */
-  evaluator?: "PASS" | "NEEDS_WORK";
   timestamp: string;
 }
 
@@ -68,13 +76,6 @@ export interface HarnessState {
   /** Where the work happens. The run folder is not the working directory. */
   cwd: string;
 
-  /**
-   * The oracle. A shell command whose exit code decides done-ness — 0 is done,
-   * anything else is not. Asked for at init, never guessed: only the user knows
-   * whether this project is `pytest -x -q`, `bun test`, or `make check`.
-   */
-  validationCommand: string;
-
   status: RunStatus;
   iteration: number;
 
@@ -82,7 +83,7 @@ export interface HarnessState {
   sessionChain: string[];
 
   lastVerdict: Verdict;
-  /** Clipped output of the last validation run, for `/harness status`. */
+  /** The reviewer's findings from the last iteration, clipped. */
   lastOutput: string;
   history: IterationRecord[];
 
@@ -220,7 +221,6 @@ export function writeState(state: HarnessState): void {
 export function createRun(opts: {
   name: string;
   cwd: string;
-  validationCommand: string;
   task: string;
 }): HarnessState {
   const now = new Date().toISOString();
@@ -245,7 +245,6 @@ export function createRun(opts: {
   const state: HarnessState = {
     name: opts.name,
     cwd: opts.cwd,
-    validationCommand: opts.validationCommand,
     status: "idle",
     iteration: 0,
     sessionChain: [],

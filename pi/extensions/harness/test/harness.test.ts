@@ -198,7 +198,6 @@ describe("state round-trip", () => {
     const created = st.createRun({
       name: "demo",
       cwd: "/tmp/project",
-      validationCommand: "pytest -x -q",
       task: "# Task: demo\n",
     });
 
@@ -210,7 +209,6 @@ describe("state round-trip", () => {
 
     const read = st.readState("demo");
     assert.ok(read, "state should read back");
-    assert.equal(read.validationCommand, "pytest -x -q");
     assert.equal(read.cwd, "/tmp/project");
 
     read.iteration = 7;

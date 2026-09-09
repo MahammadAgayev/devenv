@@ -60,7 +60,6 @@ export function iterationPrompt(input: PromptInput): string {
   parts.push("");
   parts.push(`- Working directory: \`${state.cwd}\``);
   parts.push(`- Run folder: \`${runDir}\` — your notes and artifacts live here`);
-  parts.push(`- Validation command: \`${state.validationCommand}\``);
   parts.push(`- Iterations so far: ${state.iteration}`);
   parts.push(`- Last verdict: ${state.lastVerdict}`);
 
@@ -79,33 +78,27 @@ export function iterationPrompt(input: PromptInput): string {
     parts.push("");
   }
 
-  if (state.lastVerdict === "FAIL" && state.lastOutput) {
-    parts.push("## Last validation output");
-    parts.push("");
-    parts.push("```");
-    parts.push(state.lastOutput);
-    parts.push("```");
-    parts.push("");
-  }
-
+  // The reviewer could not be dispatched. Nothing was judged, so there are no
+  // findings to act on — say so plainly rather than leaving the agent to guess
+  // why it got no feedback. It is very likely not the agent's fault and not
+  // fixable from inside the repo, so it is not asked to fix it.
   if (state.lastVerdict === "ERROR" && state.lastOutput) {
-    parts.push("## The validation command itself failed to run");
+    parts.push("## The reviewer could not be run");
     parts.push("");
     parts.push("```");
     parts.push(state.lastOutput);
     parts.push("```");
     parts.push("");
-    parts.push("This is not a test failure — the oracle is broken. Fix whatever stops the");
-    parts.push("command from running (missing dependency, wrong path, syntax error) before");
-    parts.push("doing anything else. Until it runs, no progress can be measured.");
+    parts.push("Nothing was judged this iteration, so this is not a verdict on your work.");
+    parts.push("Carry on with the task; the run will give up by itself if this keeps happening.");
     parts.push("");
   }
 
   if (input.evaluatorFindings) {
     parts.push("## Reviewer findings");
     parts.push("");
-    parts.push("The validation command passed, but an independent reviewer that did not watch");
-    parts.push("you write this found the work incomplete:");
+    parts.push("An independent reviewer that did not watch you write this judged the work");
+    parts.push("incomplete. This reviewer is the only check on the run:");
     parts.push("");
     parts.push(input.evaluatorFindings);
     parts.push("");
@@ -117,16 +110,18 @@ export function iterationPrompt(input: PromptInput): string {
   parts.push("");
   parts.push("Advance the task by one meaningful increment. Concretely:");
   parts.push("");
-  parts.push(`1. Run \`${state.validationCommand}\` to see the current state for yourself.`);
+  parts.push("1. Establish where things stand: build and test the project the way the task");
+  parts.push("   says to, or the way the project itself implies.");
   parts.push("2. Pick the single most valuable thing you can finish this iteration.");
-  parts.push("3. Do it, and verify it with the validation command.");
+  parts.push("3. Do it, and verify it the same way.");
   parts.push(`4. Append what happened to \`${runDir}/log.md\` — what you tried, what the`);
   parts.push("   result was, and anything a future you with no memory would need. Dead ends");
   parts.push("   are worth more than successes here: they stop the next iteration repeating them.");
   parts.push("");
   parts.push("Work only within the task. Do not refactor code the task did not ask about.");
-  parts.push("Stop when the increment is done — the harness will run the validation command");
-  parts.push("itself and start your next iteration. You do not need to loop.");
+  parts.push("Stop when the increment is done. An independent reviewer will then build and");
+  parts.push("test this repository and judge the work; you do not need to loop, and you do");
+  parts.push("not decide when the run is finished.");
 
   return parts.join("\n");
 }
@@ -157,8 +152,8 @@ export function resetSeed(state: HarnessState, runDir: string): string {
     "",
     `Progress so far: ${state.iteration} iterations, last verdict ${state.lastVerdict}.`,
     "",
-    "Do not start over. Read the log, confirm the current state with",
-    `\`${state.validationCommand}\`, and continue from there.`,
+    "Do not start over. Read the log, confirm the current state by building and",
+    "testing the project yourself, and continue from there.",
   ].join("\n");
 }
 

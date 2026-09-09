@@ -30,7 +30,7 @@ import type {
 import { spawn } from "node:child_process";
 import { CONFIG } from "./config.ts";
 import { setActiveRun } from "./control.ts";
-import { evaluate, runValidation, type EvaluatorVerdict } from "./oracle.ts";
+import { evaluate } from "./oracle.ts";
 import { finalNotePrompt, iterationPrompt, resetSeed } from "./prompts.ts";
 import {
   appendLog,
@@ -48,11 +48,11 @@ import {
 
 /** Why a run stopped. Recorded in state and used for the closing note. */
 type EndReason =
-  | "validation passed and review confirmed it"
+  | "the reviewer confirmed it is done"
   | "stopped by user"
   | "hit the iteration limit"
   | "hit the reset limit"
-  | "the validation command is broken"
+  | "the reviewer could not be run"
   | "interrupted";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -267,58 +267,55 @@ function reloadAfterTurn(state: HarnessState): HarnessState {
 /** What the oracle concluded this iteration. */
 interface OracleReading {
   verdict: Verdict;
-  /** Exit code of the validation command, or null when it could not run. */
-  exitCode: number | null;
-  /** Set only when the evaluator actually ran this iteration. */
-  evaluatorVerdict?: EvaluatorVerdict;
-  /** The evaluator's complaint, to be fed into the next prompt. Set only on NEEDS_WORK. */
+  /** The reviewer's complaint, fed into the next prompt. Set only on NEEDS_WORK. */
   findings?: string;
-  /** Both layers agree the work is finished. */
+  /** The reviewer judged the work finished. */
   done: boolean;
 }
 
 /**
- * Run the validation command, and the evaluator if it passed.
+ * Ask the reviewer where the work stands.
  *
- * Mutates and persists `state`: the verdict, the clipped output, and the history
- * entry all belong to the iteration that just ended, and a crash between here
- * and the next write should not lose them.
+ * Runs every iteration, and its verdict is the whole reading: PASS ends the run,
+ * NEEDS_WORK becomes FAIL and the findings go into the next prompt.
  *
- * The evaluator only runs behind a passing command, which is what keeps it
- * affordable — the expensive judgement is asked for once, at the point where the
- * cheap one says we might be done.
+ * A reviewer that could not be dispatched at all is ERROR rather than FAIL. The
+ * difference is what the loop does next — FAIL means keep working, ERROR means
+ * nothing is being measured and iterating cannot help.
+ *
+ * Mutates and persists `state`: the verdict and the findings belong to the
+ * iteration that just ended, and a crash between here and the next write should
+ * not lose them.
  */
 async function consultOracle(ctx: LoopContext, state: HarnessState): Promise<OracleReading> {
-  const validation = await runValidation(state.validationCommand, state.cwd, ctx.signal);
-  state.lastVerdict = validation.verdict;
-  state.lastOutput = validation.output;
+  ctx.ui.notify(`harness "${state.name}": reviewing`, "info");
 
-  let evaluatorVerdict: EvaluatorVerdict | undefined;
-  let findings: string | undefined;
+  const evaluation = await evaluate({
+    cwd: state.cwd,
+    task: readTask(state.name),
+    iteration: state.iteration,
+    model: ctx.model ? `${ctx.model.provider}/${ctx.model.id}` : undefined,
+    signal: ctx.signal,
+  });
 
-  if (validation.verdict === "PASS" && CONFIG.useEvaluator) {
-    ctx.ui.notify(`harness "${state.name}": validation passed — reviewing`, "info");
-    const evaluation = await evaluate({
-      cwd: state.cwd,
-      task: readTask(state.name),
-      validationCommand: state.validationCommand,
-      validationOutput: validation.output,
-      model: ctx.model ? `${ctx.model.provider}/${ctx.model.id}` : undefined,
-      signal: ctx.signal,
-    });
-    evaluatorVerdict = evaluation.verdict;
-    if (evaluation.verdict === "NEEDS_WORK") {
-      findings = evaluation.findings;
-      appendLog(state.name, `reviewer returned NEEDS_WORK: ${evaluation.findings.slice(0, 200)}`);
-    }
+  state.lastOutput = evaluation.findings;
+
+  if (evaluation.errored) {
+    state.lastVerdict = "ERROR";
+    appendLog(state.name, `reviewer could not be run: ${evaluation.findings.slice(0, 200)}`);
+    return { verdict: "ERROR", done: false };
+  }
+
+  const passed = evaluation.verdict === "PASS";
+  state.lastVerdict = passed ? "PASS" : "FAIL";
+  if (!passed) {
+    appendLog(state.name, `reviewer returned NEEDS_WORK: ${evaluation.findings.slice(0, 200)}`);
   }
 
   return {
-    verdict: validation.verdict,
-    exitCode: validation.exitCode,
-    evaluatorVerdict,
-    findings,
-    done: validation.verdict === "PASS" && (!CONFIG.useEvaluator || evaluatorVerdict === "PASS"),
+    verdict: state.lastVerdict,
+    findings: passed ? undefined : evaluation.findings,
+    done: passed,
   };
 }
 
@@ -326,8 +323,8 @@ async function consultOracle(ctx: LoopContext, state: HarnessState): Promise<Ora
  * Append the iteration to the history and take the commit snapshot.
  *
  * Separate from `consultOracle` so the caller can decline to record: an
- * iteration killed by a third unrunnable validation command measured nothing,
- * and gets neither a history row nor a snapshot. Reading the oracle and writing
+ * iteration killed by a third unrunnable reviewer measured nothing, and gets
+ * neither a history row nor a snapshot. Reading the oracle and writing
  * down what it said are also just different jobs — one talks to the outside
  * world, the other only touches `state`.
  */
@@ -335,8 +332,6 @@ function recordIteration(state: HarnessState, reading: OracleReading): void {
   state.history.push({
     iteration: state.iteration,
     verdict: reading.verdict,
-    exitCode: reading.exitCode,
-    ...(reading.evaluatorVerdict ? { evaluator: reading.evaluatorVerdict } : {}),
     timestamp: new Date().toISOString(),
   });
   writeState(state);
@@ -457,9 +452,9 @@ export async function runLoop(
 
   let isFresh = freshSession;
   let pendingFindings: string | undefined;
-  // Consecutive iterations where the validation command could not run at all.
-  // Distinct from failing tests: a broken oracle means nothing is being
-  // measured, so looping on it burns tokens producing no signal.
+  // Consecutive iterations where the reviewer could not be dispatched at all.
+  // Distinct from NEEDS_WORK: a broken oracle means nothing is being measured, so
+  // looping on it burns tokens producing no signal.
   let consecutiveErrors = 0;
 
   for (;;) {
@@ -486,24 +481,24 @@ export async function runLoop(
     const reading = await consultOracle(ctx, state);
     pendingFindings = reading.findings;
 
-    // Three strikes on a command that will not even execute. The agent has had
-    // three iterations with an explicit "fix the oracle first" prompt; if it
-    // still cannot run, something outside its reach is wrong.
+    // A few strikes on a reviewer that will not dispatch at all. This is not the
+    // reviewer saying the work is unfinished — it is the reviewer never having
+    // run, which no amount of iterating will fix.
     //
     // Checked before recording: an iteration that measured nothing earns no
     // history entry and no snapshot, so a broken oracle does not pad the run's
-    // record with three identical ERROR rows.
+    // record with identical ERROR rows.
     consecutiveErrors = reading.verdict === "ERROR" ? consecutiveErrors + 1 : 0;
-    if (consecutiveErrors >= 3) {
+    if (consecutiveErrors >= CONFIG.maxEvaluatorErrors) {
       writeState(state);
-      await finishRun(pi, ctx, state, "the validation command is broken", "failed");
+      await finishRun(pi, ctx, state, "the reviewer could not be run", "failed");
       return;
     }
 
     recordIteration(state, reading);
 
     if (reading.done) {
-      await finishRun(pi, ctx, state, "validation passed and review confirmed it", "done");
+      await finishRun(pi, ctx, state, "the reviewer confirmed it is done", "done");
       return;
     }
 

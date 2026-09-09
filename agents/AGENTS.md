@@ -69,6 +69,16 @@ For multi-step tasks, state a brief plan:
 
 Strong success criteria let you loop independently. Weak criteria ("make it work") require constant clarification.
 
+## 6. Subagent Usage
+
+**Reading to find out goes to a subagent. Reading to decide stays with you.**
+
+- Don't know which files matter yet — `scout`. Mechanical sweep — `sonic`. Second opinion — `reviewer`.
+- Independent questions go in one parallel call, not one at a time.
+- Do it yourself when you already know the line, or you're editing.
+
+Ask for the finding, not the transcript. Verify anything load-bearing — a subagent can be confidently wrong and its context is gone.
+
 ---
 
 **These guidelines are working if:** fewer unnecessary changes in diffs, fewer rewrites due to overcomplication, and clarifying questions come before implementation rather than after mistakes.

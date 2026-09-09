@@ -8,9 +8,9 @@
  * only to keep the import graph acyclic: `loop.ts` needs CONFIG, and `index.ts`
  * needs `loop.ts`.
  *
- * Per-run settings — the validation command above all — are NOT here. They are
- * asked for at `/harness init` and stored in the run's `state.json`, because
- * they are properties of the project, not of the harness.
+ * Everything here is a property of the harness. Anything specific to the work —
+ * including how the project is built and tested — belongs in the run's
+ * `task.md`, where the agent and the reviewer both read it.
  */
 
 export interface HarnessConfig {
@@ -34,11 +34,8 @@ export interface HarnessConfig {
    */
   maxResets: number;
 
-  /** Timeout for a single validation-command run. */
-  validationTimeoutMs: number;
-
-  /** Validation output kept in state and shown to the agent, in characters. */
-  validationOutputClip: number;
+  /** Reviewer findings kept in state and shown to the agent, in characters. */
+  findingsClip: number;
 
   /**
    * How long to wait for a turn to actually start after sending a prompt.
@@ -53,13 +50,13 @@ export interface HarnessConfig {
   pollIntervalMs: number;
 
   /**
-   * Run the evaluator subagent once the validation command passes.
+   * Consecutive iterations where the reviewer itself failed to run before the
+   * run gives up.
    *
-   * The validation command is the primary oracle; the evaluator is a second
-   * opinion from a context that never watched the code get written, which is
-   * what catches "passes the test by special-casing the test."
+   * A crashed subagent measured nothing, so looping on it produces no signal.
+   * Distinct from NEEDS_WORK, which is a real reading and means keep going.
    */
-  useEvaluator: boolean;
+  maxEvaluatorErrors: number;
 
   /** Commit any dirty worktree after each iteration, as a monitoring backstop. */
   commitEachIteration: boolean;
@@ -69,10 +66,9 @@ export const CONFIG: HarnessConfig = {
   resetThresholdPercent: 70,
   maxIterations: 50,
   maxResets: 25,
-  validationTimeoutMs: 10 * 60 * 1000,
-  validationOutputClip: 4000,
+  findingsClip: 4000,
   turnStartTimeoutMs: 15000,
   pollIntervalMs: 100,
-  useEvaluator: true,
+  maxEvaluatorErrors: 3,
   commitEachIteration: true,
 };

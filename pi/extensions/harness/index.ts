@@ -5,8 +5,7 @@
  * per reset, an external oracle deciding done-ness, and durable state on disk
  * so no session carries the project in its head.
  *
- *   /harness init [name]     create a run — asks for the goal and the
- *                            validation command
+ *   /harness init [name]     create a run — asks for the goal
  *   /harness start [name]    run it. Does not return until the run ends.
  *   /harness status [name]   deterministic, no model, instant
  *   /harness recap [name]    two sentences from a forked context
@@ -23,7 +22,6 @@ import { existsSync } from "node:fs";
 import { CONFIG } from "./config.ts";
 import { getActiveRun, registerStopGate, setActiveRun } from "./control.ts";
 import { startRun } from "./loop.ts";
-import { runValidation } from "./oracle.ts";
 import { recap } from "./recap.ts";
 import {
   createRun,
@@ -224,7 +222,6 @@ export default function (pi: ExtensionAPI) {
             `Start harness run "${name}"?`,
             [
               `Working directory: ${state.cwd}`,
-              `Validation: ${state.validationCommand}`,
               `Up to ${CONFIG.maxIterations} iterations, resetting context at ${CONFIG.resetThresholdPercent}%.`,
               "",
               "This session will drive the run until it finishes.",
@@ -251,13 +248,17 @@ export default function (pi: ExtensionAPI) {
 }
 
 /**
- * Create a run: ask for the goal and the validation command, write the folder.
+ * Create a run: ask for the goal, write the folder.
  *
- * The validation command is asked for rather than defaulted, deliberately.
- * Only the user knows whether this project is `pytest -x -q`, `bun test`, or
- * `make check`, and a wrong default is worse than a prompt — a harness whose
- * oracle does not measure the right thing will confidently finish having done
- * nothing.
+ * Deliberately only two questions. An earlier version also demanded a validation
+ * command and probed it here, which sounds prudent and was not: it asked for a
+ * single exit-0 command before the work existed, and the honest answer is often
+ * "there isn't one yet". Answered with prose, it produced a run that spent every
+ * iteration on exit 127 and measured nothing.
+ *
+ * Whatever check the project does have belongs in `task.md`, in whatever form it
+ * actually takes. The reviewer reads it, and is told to find and run the build
+ * and tests itself.
  */
 async function initRun(ctx: ExtensionCommandContext, requested: string): Promise<void> {
   const name =
@@ -282,52 +283,6 @@ async function initRun(ctx: ExtensionCommandContext, requested: string): Promise
     return;
   }
 
-  const validationCommand = (
-    await ctx.ui.input("Command that proves it is done (exit 0 = done)", "e.g. pytest -x -q")
-  )?.trim();
-  if (!validationCommand) {
-    ctx.ui.notify("harness: a run needs a validation command — it is the oracle", "error");
-    return;
-  }
-
-  // Actually run it before accepting it.
-  //
-  // The command is the entire basis for deciding done-ness, and a typo is
-  // indistinguishable from a failing suite until three iterations have been
-  // burned proving it. Checking here costs one command run and catches the
-  // whole class — wrong name, not on PATH, wrong directory.
-  //
-  // A non-zero exit is expected and fine: at init the work is not done, so a
-  // real oracle *should* fail. Only "could not execute at all" is fatal.
-  ctx.ui.notify(`Checking \`${validationCommand}\`…`, "info");
-  const probe = await runValidation(validationCommand, ctx.cwd);
-
-  if (probe.verdict === "ERROR") {
-    const proceed = await ctx.ui.confirm(
-      "That command does not run",
-      [
-        `\`${validationCommand}\` could not be executed in ${ctx.cwd}:`,
-        "",
-        probe.output.slice(0, 400) || "(no output)",
-        "",
-        "The validation command is how the harness decides the work is done.",
-        "If it cannot run, every iteration is unmeasurable and the run will",
-        "give up after three attempts.",
-        "",
-        "Create the run anyway? (Fix the command in state.json before starting.)",
-      ].join("\n"),
-    );
-    if (!proceed) return;
-  } else {
-    // Exit 0 at init usually means the command does not measure the new work
-    // — an empty test suite, or a filter that matches nothing.
-    const summary =
-      probe.verdict === "PASS"
-        ? "it already exits 0, so it does not yet measure the work you are asking for"
-        : `it runs and currently fails (exit ${probe.exitCode}) — which is what you want at the start`;
-    ctx.ui.notify(`Validation command OK: ${summary}.`, probe.verdict === "PASS" ? "warning" : "info");
-  }
-
   const task = [
     `# Task: ${name}`,
     "",
@@ -337,8 +292,11 @@ async function initRun(ctx: ExtensionCommandContext, requested: string): Promise
     "",
     "## Done when",
     "",
-    `\`${validationCommand}\` exits 0, and an independent reviewer agrees the work is`,
-    "genuinely complete rather than merely passing.",
+    "An independent reviewer, reading the diff and running this project's own build",
+    "and tests, agrees the work is genuinely complete rather than merely plausible.",
+    "",
+    "If there is a specific command that proves it — a test suite, a build, a lint —",
+    "name it here and the reviewer will use it.",
     "",
     "## Constraints",
     "",
@@ -352,7 +310,7 @@ async function initRun(ctx: ExtensionCommandContext, requested: string): Promise
     "",
   ].join("\n");
 
-  createRun({ name, cwd: ctx.cwd, validationCommand, task });
+  createRun({ name, cwd: ctx.cwd, task });
 
   ctx.ui.notify(
     [
@@ -360,7 +318,6 @@ async function initRun(ctx: ExtensionCommandContext, requested: string): Promise
       "",
       `  task:       ${taskPath(name)}`,
       `  folder:     ${runDir(name)}`,
-      `  validation: ${validationCommand}`,
       `  cwd:        ${ctx.cwd}`,
       "",
       "Edit task.md to sharpen the contract, then: /harness start",

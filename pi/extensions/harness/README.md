@@ -5,7 +5,7 @@ context windows: fresh context per reset, an external oracle deciding done-ness,
 and durable state on disk so no session carries the project in its head.
 
 ```
-/harness init [name]     create a run — asks for the goal and the validation command
+/harness init [name]     create a run — asks for a name and a goal
 /harness start [name]    run it; does not return until it ends
 /harness status [name]   iteration, verdict, resets — no model call, instant
 /harness recap [name]    two sentences on what is actually happening
@@ -17,9 +17,10 @@ and durable state on disk so no session carries the project in its head.
 
 Three things make a run survive its own length:
 
-1. **An oracle that is not the model.** A shell command you name at init. Exit 0
-   means done. An agent asked "are you finished?" says yes; `pytest -x -q` does
-   not.
+1. **An oracle that is not the agent.** A reviewer subagent in a context that
+   never watched the code get written, which must build and test the project
+   itself before it may answer. An agent asked "are you finished?" says yes; one
+   that has to run the suite first has something to be wrong about.
 2. **Fresh context, not compaction.** At 70% context the run starts a genuinely
    new session seeded from its own notes. Compaction keeps the summary of a
    confused session; a reset does not.
@@ -52,11 +53,18 @@ iteration, and it is the only thing standing between a long run and drift.
 /harness init auth-refresh
 ```
 
-It asks three things: a name, a one-line goal, and **the command that proves it
-is done**. That last one is not optional and has no default — only you know
-whether this project is `pytest -x -q`, `bun test`, or `make check`. A default
-here would be a harness whose oracle measures the wrong thing, which finishes
-confidently having done nothing.
+It asks two things: a name and a one-line goal.
+
+It used to ask for a third — a validation command, exit 0 means done — and
+require it. The idea was sound (a shell exit code is not a model judgement) and
+the mechanism was not: it demanded a single command before the work existed,
+which many tasks do not have. Answered with prose rather than a command, a run
+spent every iteration on exit 127 and measured nothing.
+
+So if there is a command that proves this task is done, put it in `task.md`. The
+reviewer reads the task and is told to prefer a command named there over
+anything it infers. If there isn't one, say how the project is normally built
+and tested, and it will work that out for itself.
 
 Then sharpen `task.md`, and:
 
@@ -104,32 +112,39 @@ length requests: in the agent's system prompt, in the dispatch prompt, and by
 
 ## The evaluator
 
-When the validation command passes, a second agent reviews the diff from a
-context that never watched the code get written. It looks for the ways a green
-check lies: an assertion loosened, a function special-cased for its test, a stub
-reported as an implementation.
+Every iteration, an agent reviews the work from a context that never watched the
+code get written. It is the entire oracle, so its prompt spends most of its
+length on one instruction: establish the facts before judging. Find how the
+project builds and tests, run that, report what it printed. A tree that does not
+build is `NEEDS_WORK` however well the code reads.
+
+Then it looks for the ways work can look finished without being finished: an
+assertion loosened, a function special-cased for its test, a stub reported as an
+implementation.
 
 It can send the run back with `NEEDS_WORK`, and its findings go into the next
 iteration's prompt verbatim. It defaults to `NEEDS_WORK` when unsure — a false
 PASS ends the run and ships incomplete work; a false NEEDS_WORK costs one
 iteration. Not symmetric.
 
-Turn it off with `useEvaluator: false` in `config.ts` if the validation command
-is strict enough to stand alone.
+A reviewer that *cannot be dispatched* is a third case, `ERROR`, and not a
+verdict at all: nothing was measured, so the loop stops after
+`maxEvaluatorErrors` of them rather than burning fifty iterations on a broken
+subagent.
 
 ## Why it ends
 
 | Reason | Status |
 |---|---|
-| Validation passed and the evaluator agreed | `done` |
+| The reviewer said PASS | `done` |
 | `AGENT_STOP` appeared | `stopped` |
 | Hit `maxIterations` (50) | `failed` |
 | Hit `maxResets` (25) | `failed` |
-| Validation command unrunnable 3× in a row | `failed` |
+| Reviewer undispatchable 3× in a row | `failed` |
 
-That last one matters: exit 126/127 means the oracle is broken, not that a test
-failed. Without the distinction a typo in the validation command looks exactly
-like a suite that never passes, and the run spends all 50 iterations on it.
+That last one matters: a reviewer that crashed is not a reviewer that said no.
+Without the distinction a broken dispatch looks exactly like work that never
+converges, and the run spends all 50 iterations on it.
 
 ## Configuration
 
@@ -141,12 +156,12 @@ error rather than a silent fallback at 2am in iteration 40.
 | `resetThresholdPercent` | 70 | context % that triggers a fresh session |
 | `maxIterations` | 50 | |
 | `maxResets` | 25 | also bounds recursion depth |
-| `validationTimeoutMs` | 600000 | per validation run |
-| `useEvaluator` | true | second-opinion review on PASS |
+| `findingsClip` | 4000 | reviewer findings kept in state, in chars |
+| `maxEvaluatorErrors` | 3 | consecutive undispatchable reviewers before giving up |
 | `commitEachIteration` | true | monitoring backstop |
 
-The validation command is *not* here — it is per-project, and lives in the run's
-`state.json`.
+Nothing per-project is here. How the work is built and tested belongs in the
+run's `task.md`, where both the agent and the reviewer read it.
 
 ## How the loop can reset its own context
 
@@ -183,12 +198,12 @@ The result is that every module except the subagent call path loads standalone,
 so the logic worth testing is testable. Keep it that way: a new value import
 from a package would silently make this suite unrunnable again.
 
-37 tests. The unit suite covers verdict parsing, sentence truncation, output
-clipping, name sanitization, and the state round-trip; the integration suite
-runs the oracle against real processes.
+58 tests, covering verdict parsing, the reviewer prompt's load-bearing
+instructions, sentence truncation, output clipping, name sanitization, and the
+state round-trip.
 
-Both suites were mutation-tested — deliberately breaking the bottom-up verdict
-scan and the sentence-boundary lookahead each produced exactly one failure.
+Mutation-tested — deliberately breaking the bottom-up verdict scan and the
+sentence-boundary lookahead each produced exactly one failure.
 
 ## Files
 
@@ -198,7 +213,7 @@ scan and the sentence-boundary lookahead each produced exactly one failure.
 | `config.ts` | the typed `CONFIG` constant |
 | `state.ts` | `~/.pi/harness/<name>/` — the only cross-session memory |
 | `loop.ts` | iteration, reset, recursion, commit backstop |
-| `oracle.ts` | validation command + evaluator dispatch |
+| `oracle.ts` | reviewer prompt + dispatch + verdict parsing |
 | `control.ts` | `AGENT_STOP` tool-call gate |
 | `recap.ts` | transcript dump + two-sentence cap |
 | `prompts.ts` | iteration prompt, reset seed, closing note |
