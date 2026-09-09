@@ -354,8 +354,10 @@
   # typeset -g POWERLEVEL9K_DIR_PREFIX='%fin '
 
   #####################################[ vcs: git status ]######################################
-  # Branch icon. Set this parameter to '\UE0A0 ' for the popular Powerline branch icon.
-  typeset -g POWERLEVEL9K_VCS_BRANCH_ICON='\uE0A0 '
+  # Branch icon. \uF126 is the git-branch glyph pi's statusline uses
+  # (pi/extensions/statusline/theme.ts), rather than the classic powerline
+  # \uE0A0 — same meaning, and it matches the prompt above the prompt.
+  typeset -g POWERLEVEL9K_VCS_BRANCH_ICON='\uF126 '
 
   # Untracked files icon. It's really a question mark, your font isn't broken.
   # Change the value of this parameter to show a different icon.
@@ -382,10 +384,10 @@
     if (( $1 )); then
       # Styling for up-to-date Git status.
       local       meta='%F{#908caa}'  # subtle foreground
-      local      clean='%F{#9ccfd8}'  # foam foreground
-      local   modified='%F{#f6c177}'  # gold foreground
+      local      clean='%F{#f6c177}'  # gold — matches pi's git segment
+      local   modified='%F{#eb6f92}'  # love foreground
       local  untracked='%F{#3e8fb0}'  # pine foreground
-      local conflicted='%F{#eb6f92}'  # love foreground
+      local conflicted='%F{#c4a7e7}'  # iris — love is now modified
     else
       # Styling for incomplete and stale Git status.
       local       meta='%F{#56526e}'  # border foreground
@@ -513,9 +515,12 @@
 
   # These settings are used for repositories other than Git or when gitstatusd fails and
   # Powerlevel10k has to fall back to using vcs_info.
-  typeset -g POWERLEVEL9K_VCS_CLEAN_FOREGROUND=$rp_foam
-  typeset -g POWERLEVEL9K_VCS_UNTRACKED_FOREGROUND=$rp_foam
-  typeset -g POWERLEVEL9K_VCS_MODIFIED_FOREGROUND=$rp_gold
+  # Gold at rest, to match pi's git segment (statusline paints it `warning`,
+  # which is gold in rose-pine-moon). Dirty states move to love so the
+  # clean/modified signal survives the change.
+  typeset -g POWERLEVEL9K_VCS_CLEAN_FOREGROUND=$rp_gold
+  typeset -g POWERLEVEL9K_VCS_UNTRACKED_FOREGROUND=$rp_gold
+  typeset -g POWERLEVEL9K_VCS_MODIFIED_FOREGROUND=$rp_love
 
   ##########################[ status: exit code of the last command ]###########################
   # Enable OK_PIPE, ERROR_PIPE and ERROR_SIGNAL status states to allow us to enable, disable and
