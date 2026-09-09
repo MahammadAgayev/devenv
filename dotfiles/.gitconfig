@@ -1,7 +1,7 @@
 [user]
 	name = Mahammad Aghayev
 	email = mahammadmaghayev@gmail.com
-	signingkey = 9B:CE:93:6D:ED:78:6C:A4:14:47:7F:1D:2E:92:8F:2B:CF:72:4C:43
+	signingkey =
 
 [alias]
     lg = log --graph --pretty=format:'%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%ar) %C(bold blue)<%an>%Creset'
