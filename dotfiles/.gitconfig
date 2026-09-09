@@ -56,7 +56,3 @@
 # Override all with uber config
 [include]
 	path = ~/.gitconfig_uber
-[gpg]
-	format = x509
-[gpg "x509"]
-	program = /opt/uber/bin/signingfx
