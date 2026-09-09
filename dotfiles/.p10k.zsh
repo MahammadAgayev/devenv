@@ -22,14 +22,20 @@
   # Zsh >= 5.1 is required.
   [[ $ZSH_VERSION == (5.<1->*|<6->.*) ]] || return
 
-  # Rose Pine Moon palette. Referenced by the segment colors below.
-  local rp_foam='#9ccfd8'     # accent
-  local rp_subtle='#908caa'   # muted text
-  local rp_muted='#6e6a86'    # dim text
-  local rp_gold='#f6c177'     # warning
+  # Rose Pine Moon palette, kept in step with pi/themes/rose-pine-moon.json.
+  #
+  # The comments name the role each colour plays in pi's statusline
+  # (pi/extensions/statusline/segments.ts), because the point is that the prompt
+  # and the statusline directly above it agree: gold is always git, foam is
+  # always the accent, muted is always chrome.
+  local rp_foam='#9ccfd8'     # accent      — model, agent name
+  local rp_subtle='#908caa'   # muted       — cwd, tokens
+  local rp_muted='#6e6a86'    # dim         — time
+  local rp_gold='#f6c177'     # warning     — git branch
   local rp_love='#eb6f92'     # error
+  local rp_sage='#95b1ac'     # success     — cost, diff added
   local rp_pine='#3e8fb0'     # cool accent
-  local rp_iris='#c4a7e7'     # violet
+  local rp_iris='#c4a7e7'     # thinkingHigh
   local rp_border='#56526e'   # rules, gaps
 
 
@@ -530,13 +536,13 @@
   # Status on success. No content, just an icon. No need to show it if prompt_char is enabled as
   # it will signify success by turning green.
   typeset -g POWERLEVEL9K_STATUS_OK=false
-  typeset -g POWERLEVEL9K_STATUS_OK_FOREGROUND=$rp_foam
+  typeset -g POWERLEVEL9K_STATUS_OK_FOREGROUND=$rp_sage
   typeset -g POWERLEVEL9K_STATUS_OK_VISUAL_IDENTIFIER_EXPANSION='✔'
 
   # Status when some part of a pipe command fails but the overall exit status is zero. It may look
   # like this: 1|0.
   typeset -g POWERLEVEL9K_STATUS_OK_PIPE=true
-  typeset -g POWERLEVEL9K_STATUS_OK_PIPE_FOREGROUND=$rp_foam
+  typeset -g POWERLEVEL9K_STATUS_OK_PIPE_FOREGROUND=$rp_sage
   typeset -g POWERLEVEL9K_STATUS_OK_PIPE_VISUAL_IDENTIFIER_EXPANSION='✔'
 
   # Status when it's just an error code (e.g., '1'). No need to show it if prompt_char is enabled as
@@ -564,7 +570,7 @@
   # Show this many fractional digits. Zero means round to seconds.
   typeset -g POWERLEVEL9K_COMMAND_EXECUTION_TIME_PRECISION=0
   # Execution time color.
-  typeset -g POWERLEVEL9K_COMMAND_EXECUTION_TIME_FOREGROUND=$rp_gold
+  typeset -g POWERLEVEL9K_COMMAND_EXECUTION_TIME_FOREGROUND=$rp_muted
   # Duration format: 1d 2h 3m 4s.
   typeset -g POWERLEVEL9K_COMMAND_EXECUTION_TIME_FORMAT='d h m s'
   # Custom icon.
@@ -582,7 +588,7 @@
 
   #######################[ direnv: direnv status (https://direnv.net/) ]########################
   # Direnv color.
-  typeset -g POWERLEVEL9K_DIRENV_FOREGROUND=178
+  typeset -g POWERLEVEL9K_DIRENV_FOREGROUND=$rp_iris
   # Custom icon.
   # typeset -g POWERLEVEL9K_DIRENV_VISUAL_IDENTIFIER_EXPANSION='⭐'
 
@@ -914,12 +920,15 @@
   # typeset -g POWERLEVEL9K_CPU_ARCH_VISUAL_IDENTIFIER_EXPANSION='⭐'
 
   ##################################[ context: user@hostname ]##################################
-  # Context color when running with privileges.
-  typeset -g POWERLEVEL9K_CONTEXT_ROOT_FOREGROUND=178
-  # Context color in SSH without privileges.
-  typeset -g POWERLEVEL9K_CONTEXT_{REMOTE,REMOTE_SUDO}_FOREGROUND=180
+  # Context color when running with privileges. Love: root is the one case here
+  # that should read as a warning.
+  typeset -g POWERLEVEL9K_CONTEXT_ROOT_FOREGROUND=$rp_love
+  # Context color in SSH without privileges. Iris rather than a gold, so the
+  # only gold in the prompt is git — the two sat side by side over SSH and were
+  # near-indistinguishable (#d7af87 vs the branch's #f6c177).
+  typeset -g POWERLEVEL9K_CONTEXT_{REMOTE,REMOTE_SUDO}_FOREGROUND=$rp_iris
   # Default context color (no privileges, no SSH).
-  typeset -g POWERLEVEL9K_CONTEXT_FOREGROUND=180
+  typeset -g POWERLEVEL9K_CONTEXT_FOREGROUND=$rp_subtle
 
   # Context format when running with privileges: bold user@hostname.
   typeset -g POWERLEVEL9K_CONTEXT_ROOT_TEMPLATE='%B%n@%m'
@@ -939,7 +948,7 @@
 
   ###[ virtualenv: python virtual environment (https://docs.python.org/3/library/venv.html) ]###
   # Python virtual environment color.
-  typeset -g POWERLEVEL9K_VIRTUALENV_FOREGROUND=37
+  typeset -g POWERLEVEL9K_VIRTUALENV_FOREGROUND=$rp_pine
   # Don't show Python version next to the virtual environment name.
   typeset -g POWERLEVEL9K_VIRTUALENV_SHOW_PYTHON_VERSION=false
   # If set to "false", won't show virtualenv if pyenv is already shown.
