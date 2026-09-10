@@ -1,0 +1,5 @@
+__pycache__/
+*.pyc
+
+# harness run folders — logs, state, and pi session transcripts
+.harness/

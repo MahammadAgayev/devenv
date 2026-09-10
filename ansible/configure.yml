@@ -80,6 +80,23 @@
         force: true
         mode: '0755'
 
+    # ~/.local/bin rather than ~/ because it is already on PATH (see .zshrc),
+    # so `harness` works as a command with no alias. The script resolves its own
+    # directory through the symlink to find evaluator.md.
+    - name: Ensure ~/.local/bin exists
+      file:
+        path: "{{ home }}/.local/bin"
+        state: directory
+        mode: '0755'
+
+    - name: Symlink harness
+      file:
+        src: "{{ devenv }}/agents/harness/harness.py"
+        dest: "{{ home }}/.local/bin/harness"
+        state: link
+        force: true
+        mode: '0755'
+
     - name: Ensure ~/.config/ghostty exists
       file:
         path: "{{ home }}/.config/ghostty"
