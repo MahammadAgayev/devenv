@@ -50,8 +50,10 @@ import json
 import os
 import re
 import shutil
+import signal
 import subprocess
 import sys
+import threading
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -64,7 +66,10 @@ MAX_ITERATIONS = 40
 # that crashed is not a reviewer that said no: nothing was measured, so
 # iterating on it produces no signal.
 MAX_REVIEW_ERRORS = 3
-REVIEW_TIMEOUT_S = 10 * 60
+# The evaluator is told to build the project and run its tests, so its budget has
+# to cover a cold build of whatever it is pointed at. Ten minutes did not: one run
+# had a 2741s worker and a reviewer killed mid-build with nothing measured.
+REVIEW_TIMEOUT_S = 60 * 60
 
 # Fixed lists: nothing that blocks on a human, since nobody is watching.
 WORKER_TOOLS = "read,bash,edit,write,grep,find,ls"
@@ -202,6 +207,12 @@ def run_pi(args: list[str], cwd: str, timeout: float | None = None) -> Result:
     `stdin=DEVNULL` is load-bearing. With an inherited pipe on stdin that nobody
     ever closes, `pi -p` waits on it forever: an earlier version sat at
     "iteration 1" for three minutes having burned 0.27s of CPU.
+
+    The timeout is a watchdog thread, not a check inside the read loop. Checking
+    on each event means the deadline only fires when the subprocess says
+    something, and a reviewer blocked in one long `bash` call says nothing: a 600s
+    limit let a build run to 815s before the next event arrived to trip it. A
+    timer fires on time whatever the child is doing.
     """
     result = Result()
     started = time.monotonic()
@@ -213,9 +224,25 @@ def run_pi(args: list[str], cwd: str, timeout: float | None = None) -> Result:
         stderr=subprocess.PIPE,
         text=True,
         bufsize=1,
+        # Its own process group, so the timeout can kill the whole tree. Killing
+        # just `pi` leaves the build it spawned holding the stdout pipe open, and
+        # the read loop below blocks until that grandchild finishes anyway.
+        start_new_session=True,
     )
-    deadline = time.monotonic() + timeout if timeout else None
-    killed = False
+    killed = threading.Event()
+
+    def on_timeout() -> None:
+        killed.set()
+        try:
+            os.killpg(proc.pid, signal.SIGKILL)
+        except (ProcessLookupError, PermissionError):
+            proc.kill()
+
+    watchdog = threading.Timer(timeout, on_timeout) if timeout else None
+    if watchdog:
+        # Daemon so a wedged timer cannot hold the process open at exit.
+        watchdog.daemon = True
+        watchdog.start()
 
     for line in proc.stdout or []:
         try:
@@ -229,15 +256,13 @@ def run_pi(args: list[str], cwd: str, timeout: float | None = None) -> Result:
         rendered = render(event)
         if rendered:
             show(rendered)
-        if deadline and time.monotonic() > deadline:
-            proc.kill()
-            killed = True
-            break
 
     proc.wait()
+    if watchdog:
+        watchdog.cancel()
     result.stderr = proc.stderr.read() if proc.stderr else ""
-    result.code = 1 if killed else (proc.returncode or 0)
-    if killed:
+    result.code = 1 if killed.is_set() else (proc.returncode or 0)
+    if killed.is_set():
         result.stderr += f"\nKilled after {int(timeout or 0)}s."
     result.seconds = int(time.monotonic() - started)
     return result
@@ -502,7 +527,13 @@ def do_start(name: str) -> int:
         show("--- reviewing")
         review = run_pi(
             [
-                "-p", "--mode", "json", "--no-session", "-ne",
+                "-p", "--mode", "json", "-ne",
+                # A fresh session id per iteration: the reviewer still starts cold,
+                # which is the independence `--no-session` was buying, but it leaves
+                # a transcript. The review that gets killed on the timeout is exactly
+                # the one worth reading, and it used to leave nothing behind.
+                "--session-dir", str(d / "sessions"),
+                "--session-id", f"{name}-review-{iteration:03d}",
                 *(["--model", eval_model] if eval_model else []),
                 "-t", REVIEW_TOOLS,
                 "--system-prompt", eval_prompt,
