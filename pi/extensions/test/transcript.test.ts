@@ -1,16 +1,15 @@
 /**
  * Tests for `lib/transcript.ts`.
  *
- * This code shipped for months as two verbatim copies — one in
- * `task-handoff.ts`, one in `harness/recap.ts` — and neither was tested,
- * because both were reachable only through a module that imports
+ * This code shipped for months as copy-pasted duplicates and was never tested,
+ * because it was reachable only through a module that imports
  * `@earendil-works/pi-coding-agent` and this repo has no node_modules.
  * Extracting it to `lib/` is what makes these assertions possible at all, so
  * they are the point of the extraction rather than an afterthought.
  *
  * What matters here is fidelity: the dump is the only thing a headless subagent
- * sees, so a dropped role or a bad clip silently degrades every handoff and
- * every recap with no error anywhere.
+ * sees, so a dropped role or a bad clip silently degrades every handoff with no
+ * error anywhere.
  *
  * Run: node --experimental-strip-types --test pi/extensions/test/transcript.test.ts
  */

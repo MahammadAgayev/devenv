@@ -1,12 +1,8 @@
 /**
  * transcript.ts — render a session's active branch as markdown.
  *
- * Two commands need the same thing: a plain-text dump of the conversation, small
- * enough to hand to a headless subagent as a file. `/handoff`
- * (`../task-handoff.ts`) uses it to write a task doc; `/harness recap`
- * (`../harness/recap.ts`) uses it to answer "what is this run doing". Both had a
- * verbatim copy of the code below, which meant a fix to one silently left the
- * other wrong.
+ * `/handoff` (`../task-handoff.ts`) needs a plain-text dump of the conversation,
+ * small enough to hand to a headless subagent as a file.
  *
  * Why `lib/`: pi loads every top-level `.ts` under `extensions/` as an extension
  * and rejects files with no default factory export, so shared modules must live
