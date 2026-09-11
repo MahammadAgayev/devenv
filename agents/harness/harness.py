@@ -13,12 +13,12 @@ so nothing here needs pi's session, event, or UI machinery.
 A run is a folder under the working directory it operates on:
 
     <cwd>/.harness/<name>/
-      task.md          the contract. Hand-edited, re-read every iteration.
+      task.md          the contract. Hand-edited, re-read every iteration — edit it
+                       mid-run and the next iteration works to the new version.
       state.json       iteration, verdict, findings, history — the only state
       log.md           the agent's own lab notes, for its future self
       reviews/NNN.md   what the reviewer said, kept to read, never parsed back
       sessions/        pi's own session files
-      STEER.md         you write here; consumed at the top of the next iteration
       STOP             `stop` writes this; the loop halts and deletes it
 
 Living beside the work rather than in `~` means two checkouts can hold runs of
@@ -32,9 +32,20 @@ existed only because two places disagreed about the count; with one writer they
 cannot. The review files are still written — they are the readable record — but
 nothing reads them back.
 
-One pi session per run, and pi's own compaction handles context growth. There is
-no reset machinery: it was worth its complexity on models that wrapped up work
-early as their context filled, and is not on models that don't.
+One pi session per iteration, not one per run. A resumed session carries real
+advantages — the agent remembers the codebase and re-explores nothing — but its
+memory is whatever compaction chose to keep, which is neither inspectable nor
+steerable, and the first thing summarised away is the early exploration that
+stops work being repeated. Starting cold each iteration moves that memory into
+log.md, which sits on disk and can be read when a run goes in circles. It also
+makes the agent's own note-taking falsifiable: notes too thin to work from
+produce a visibly lost next iteration, where before they cost nothing.
+
+Nothing is pasted into the prompt that the agent could open itself. It is told
+where the run folder is and what is in it; reading log.md is step one of its
+instructions. Injecting the file would mean a size cap, a truncation policy and
+a rule for which end to keep — three decisions bought with tokens spent every
+iteration, to save a tool call.
 
 There is no Python SDK for pi, so this drives the `pi` CLI as a subprocess. Both
 subprocesses run `--mode json` and their event streams are rendered to stdout as
@@ -112,16 +123,6 @@ def log(name: str, text: str) -> None:
 def show(line: str) -> None:
     sys.stdout.write(line + "\n")
     sys.stdout.flush()
-
-
-def take_steer(name: str) -> str:
-    """Read STEER.md and delete it, so a steer applies exactly once."""
-    p = run_dir(name) / "STEER.md"
-    if not p.exists():
-        return ""
-    text = slurp(p).strip()
-    p.unlink()
-    return text
 
 
 # --- talking to pi ---------------------------------------------------------
@@ -281,26 +282,32 @@ def evaluator_parts() -> tuple[str, str | None]:
 # --- prompts ---------------------------------------------------------------
 
 
-def worker_prompt(name: str, state: dict, task: str, steer: str) -> str:
+def worker_prompt(name: str, state: dict, task: str) -> str:
     """
     The per-iteration instruction.
 
-    Re-states the task and the paths every time: even in one long session the
-    task scrolls out of the useful window, and compaction may drop it.
+    Re-states the task in full every iteration. The session is new each time, so
+    this is the only place the agent sees it — and it is re-read from disk, so
+    editing task.md mid-run is how you change course.
     """
     d = run_dir(name)
     iteration = state["iteration"] + 1
     p = [f'[HARNESS · iteration {iteration} of run "{name}"]', ""]
 
-    if steer:
-        # First and unmistakable: a steer is the user interrupting, and it
-        # outranks whatever the agent had planned.
-        p += ["## ⚠ Course correction from the user", "", steer, ""]
-
     p += ["## Task", "", task.strip(), ""]
-    p += ["## Where things stand", ""]
-    p += [f"- Run folder: {d} — your notes and artifacts live here"]
-    p += [f"- Completed iterations: {iteration - 1}", ""]
+    p += [
+        "## Where things stand",
+        "",
+        "You have no memory of earlier iterations — each one is a fresh session.",
+        "What you know about this run is what you wrote down.",
+        "",
+        f"- Run folder: {d}",
+        "  - task.md     the contract, quoted above",
+        "  - log.md      your own notes, iteration by iteration",
+        "  - reviews/    what the reviewer said each iteration (NNN.md)",
+        f"- Completed iterations: {iteration - 1}",
+        "",
+    ]
 
     if state["verdict"] == "NEEDS_WORK":
         p += [
@@ -328,13 +335,16 @@ def worker_prompt(name: str, state: dict, task: str, steer: str) -> str:
         "",
         "Advance the task by one meaningful increment:",
         "",
-        "1. Establish where things stand — build and test the project the way the task",
+        f"1. Read {d}/log.md. It is what earlier iterations left you and the only",
+        "   memory you have of them.",
+        "2. Establish where things stand — build and test the project the way the task",
         "   says to, or the way the project itself implies.",
-        "2. Pick the single most valuable thing you can finish this iteration.",
-        "3. Do it, and verify it the same way.",
-        f"4. Append what happened to {d}/log.md — what you tried, what the result was,",
-        "   and anything a future you would need. Dead ends are worth more than",
-        "   successes: they stop the next iteration repeating them.",
+        "3. Pick the single most valuable thing you can finish this iteration.",
+        "4. Do it, and verify it the same way.",
+        f"5. Append what happened to {d}/log.md — what you tried, what the result was,",
+        "   and anything the next iteration needs. It starts with no memory of this",
+        "   one and has only what you write here: what you leave out is lost. Dead",
+        "   ends are worth more than successes — they stop the work being redone.",
         "",
         "Finish your turn with one or two sentences on what you did. That summary is",
         "what the user sees — they are not reading your tool calls or log.md.",
@@ -476,7 +486,6 @@ def do_start(name: str) -> int:
         sys.exit(f"no runnable task at {d} — write one first:\n  harness init {name}")
 
     cwd = str(Path.cwd())
-    session = f"{name}-1"
     eval_prompt, eval_model = evaluator_parts()
     review_errors = 0
     ending, status = "the loop exited without saying why", "failed"
@@ -496,10 +505,6 @@ def do_start(name: str) -> int:
             break
 
         task = slurp(d / "task.md")
-        steer = take_steer(name)
-        if steer:
-            log(name, f"Steered: {steer.splitlines()[0]}")
-
         show(f"\n=== iteration {iteration}")
         worker = run_pi(
             [
@@ -508,11 +513,16 @@ def do_start(name: str) -> int:
                 # exits, which is what made a long iteration look like a hang.
                 "-p", "--mode", "json",
                 "--session-dir", str(d / "sessions"),
-                "--session-id", session,
+                # A session per iteration rather than one resumed all run. A
+                # resumed session's memory is whatever compaction happened to
+                # keep, which is unknowable and quietly drops the early dead ends
+                # worth most. Starting cold makes log.md the memory: it is in the
+                # prompt, on disk, and reviewable when the agent goes in circles.
+                "--session-id", f"{name}-{iteration:03d}",
                 "-ne",
                 "-t", WORKER_TOOLS,
                 "--",
-                worker_prompt(name, state, task, steer),
+                worker_prompt(name, state, task),
             ],
             cwd=cwd,
         )

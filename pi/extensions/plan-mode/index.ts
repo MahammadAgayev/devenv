@@ -454,7 +454,13 @@ Do not make changes. Describe them.`,
       toolsBeforePlanMode = restored.data.toolsBeforePlanMode ?? toolsBeforePlanMode;
     }
 
-    if (planModeEnabled) enablePlanModeTools();
+    if (planModeEnabled) {
+      enablePlanModeTools();
+    } else {
+      // registerTool() activates the tool immediately, so without this it stays
+      // live in normal sessions — asking questions with no plan mode in sight.
+      pi.setActiveTools(pi.getActiveTools().filter((name) => name !== QUESTION_TOOL));
+    }
     updateStatus(ctx);
   });
 }

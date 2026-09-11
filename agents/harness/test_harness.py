@@ -304,45 +304,42 @@ class TestStop(RunFolderTest):
             harness.do_stop("never-created")
 
 
-class TestTakeSteer(RunFolderTest):
-    def setUp(self):
-        super().setUp()
-        harness.do_init(self.name)
-
-    def test_consumed_on_read(self):
-        # Left in place it would be re-injected forever and the agent would keep
-        # obeying a correction long after making it.
-        (self.run / "STEER.md").write_text("  stop refactoring  \n")
-        self.assertEqual(harness.take_steer(self.name), "stop refactoring")
-        self.assertEqual(harness.take_steer(self.name), "")
-
-
 class TestWorkerPrompt(RunFolderTest):
     def setUp(self):
         super().setUp()
         harness.do_init(self.name)
         self.state = harness.read_state(self.name)
 
-    def test_steer_comes_first(self):
-        out = harness.worker_prompt(self.name, self.state, "do the thing", "actually stop")
-        self.assertLess(out.index("Course correction"), out.index("## Task"))
+    def test_the_task_is_quoted_in_full(self):
+        # task.md is re-read every iteration and the session is new each time, so
+        # this is the agent's only sight of the contract. Editing it mid-run is
+        # the way to change course.
+        out = harness.worker_prompt(self.name, self.state, "do the thing")
+        self.assertIn("do the thing", out)
 
     def test_findings_are_passed_through_verbatim(self):
         state = {**self.state, "verdict": "NEEDS_WORK", "findings": "The test asserts nothing."}
-        out = harness.worker_prompt(self.name, state, "t", "")
+        out = harness.worker_prompt(self.name, state, "t")
         self.assertIn("The test asserts nothing.", out)
         self.assertIn("Do not argue with it by making the check weaker.", out)
 
     def test_error_is_not_reported_as_a_verdict(self):
         state = {**self.state, "verdict": "ERROR", "findings": "boom"}
-        out = harness.worker_prompt(self.name, state, "t", "")
+        out = harness.worker_prompt(self.name, state, "t")
         self.assertIn("not a verdict on your work", out)
         self.assertNotIn("Reviewer findings", out)
 
     def test_first_iteration_shows_no_findings(self):
-        out = harness.worker_prompt(self.name, self.state, "t", "")
+        out = harness.worker_prompt(self.name, self.state, "t")
         self.assertNotIn("Reviewer findings", out)
         self.assertIn("Completed iterations: 0", out)
+
+    def test_says_there_is_no_memory_of_earlier_iterations(self):
+        # A fresh session per iteration, so the prompt has to say so and point at
+        # the notes: nothing else carries across.
+        out = harness.worker_prompt(self.name, self.state, "t")
+        self.assertIn("no memory of earlier iterations", out)
+        self.assertIn(str(self.run / "log.md"), out)
 
 
 class TestPrompts(RunFolderTest):
