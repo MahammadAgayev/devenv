@@ -61,6 +61,30 @@
       args:
         creates: "{{ home }}/.local/bin/rtk"
 
+    # harness is built from source. Go is not installed by this playbook, so the
+    # build is skipped rather than failed when the toolchain is absent.
+    - name: Check if Go is available
+      shell: command -v go
+      register: go_check
+      changed_when: false
+      failed_when: false
+
+    - name: Warn when Go is missing
+      debug:
+        msg: "Go not found — skipping harness. Install Go, then re-run to get the harness CLI."
+      when: go_check.rc != 0
+
+    - name: Install harness CLI (build from source)
+      shell: "{{ go_check.stdout }} install github.com/MahammadAgayev/harness/cmd/harness@latest"
+      environment:
+        GOBIN: "{{ home }}/.local/bin"
+      when: go_check.rc == 0
+
+    - name: Verify harness is available
+      shell: test -x {{ home }}/.local/bin/harness
+      changed_when: false
+      when: go_check.rc == 0
+
     - name: Check if bun installed
       shell: command -v bun || test -x {{ home }}/.bun/bin/bun
       register: bun_check
