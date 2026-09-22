@@ -45,10 +45,16 @@
           }
         },
         {
-          "id": "gpt-56-sol",
+          "id": "gpt-5.6-sol",
           "contextWindow": 400000,
           "maxTokens": 32000,
           "reasoning": true,
+          "thinkingLevelMap": {
+            "off": "none",
+            "minimal": null,
+            "xhigh": "xhigh",
+            "max": null
+          },
           "compat": {
             "supportsDeveloperRole": false
           }
@@ -67,10 +73,31 @@
           }
         },
         {
-          "id": "gpt-56-terra",
+          "id": "gpt-5.6-terra",
           "contextWindow": 400000,
           "maxTokens": 32000,
           "reasoning": true,
+          "thinkingLevelMap": {
+            "off": "none",
+            "minimal": null,
+            "xhigh": "xhigh",
+            "max": null
+          },
+          "compat": {
+            "supportsDeveloperRole": false
+          }
+        },
+        {
+          "id": "gpt-5.6-luna",
+          "contextWindow": 400000,
+          "maxTokens": 32000,
+          "reasoning": true,
+          "thinkingLevelMap": {
+            "off": "none",
+            "minimal": null,
+            "xhigh": "xhigh",
+            "max": null
+          },
           "compat": {
             "supportsDeveloperRole": false
           }
