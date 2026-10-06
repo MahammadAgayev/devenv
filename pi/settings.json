@@ -3,7 +3,8 @@
   "defaultModel": "claude-sonnet-4-6",
   "packages": [
     "~/devenv",
-    "https://github.com/carderne/pi-nvim"
+    "https://github.com/carderne/pi-nvim",
+    "npm:mason4agents"
   ],
   "lastChangelogVersion": "0.73.1",
   "compaction": {

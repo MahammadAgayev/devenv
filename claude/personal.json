@@ -64,5 +64,7 @@
   },
   "fastMode": false,
   "tui": "default",
-  "skipDangerousModePermissionPrompt": true
+  "skipDangerousModePermissionPrompt": true,
+  "inputNeededNotifEnabled": true,
+  "agentPushNotifEnabled": true
 }
