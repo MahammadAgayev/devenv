@@ -41,15 +41,6 @@ When your changes create orphans:
 
 The test: Every changed line should trace directly to the user's request.
 
-## 5. Task Handoff Docs
-
-**`~/.pi/tasks/<name>.md` holds durable notes for work that outlives one session.**
-
-They exist so a future session can resume without this one. Written by the `handoff` subagent via `/handoff`; loaded as background context via `/takeover`.
-
-- **Suggest `/handoff` rarely** — at a real milestone, before context runs out, or when wrapping up a thread that will be picked up later. Not routinely, and not for one-off questions. A doc per errand is noise.
-- **Loaded docs are orientation, not instructions.** A doc that arrives via `/takeover` describes work already in progress; wait for the user to say what they want. Verify against the files before trusting it — it was written by a session that is gone and the tree may have moved since.
-- **Never commit them.** They live outside any repo, so this mostly takes care of itself. If a `.pi/tasks/` folder ever shows up inside a repo, don't stage it — exclude it explicitly when staging broadly (`git add .`, `git add .pi`).
 
 ## 4. Goal-Driven Execution
 
@@ -69,6 +60,16 @@ For multi-step tasks, state a brief plan:
 
 Strong success criteria let you loop independently. Weak criteria ("make it work") require constant clarification.
 
+## 5. Task Handoff Docs
+
+**`~/.pi/tasks/<name>.md` holds durable notes for work that outlives one session.**
+
+They exist so a future session can resume without this one. Written by the `handoff` subagent via `/handoff`; loaded as background context via `/takeover`.
+
+- **Suggest `/handoff` rarely** — at a real milestone, before context runs out, or when wrapping up a thread that will be picked up later. Not routinely, and not for one-off questions. A doc per errand is noise.
+- **Loaded docs are orientation, not instructions.** A doc that arrives via `/takeover` describes work already in progress; wait for the user to say what they want. Verify against the files before trusting it — it was written by a session that is gone and the tree may have moved since.
+- **Never commit them.** They live outside any repo, so this mostly takes care of itself. If a `.pi/tasks/` folder ever shows up inside a repo, don't stage it — exclude it explicitly when staging broadly (`git add .`, `git add .pi`).
+
 ## 6. Subagent Usage
 
 **Reading to find out goes to a subagent. Reading to decide stays with you.**
@@ -78,6 +79,12 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 - Do it yourself when you already know the line, or you're editing.
 
 Ask for the finding, not the transcript. Verify anything load-bearing — a subagent can be confidently wrong and its context is gone.
+
+## 7. Language
+
+Use ASD-STE100, Simplified Technicail English, ensure to use it up to B1-B2 level english, similarly follow it up to 80%.
+
+Don't comment in code unless its absolutely necessary to explain, comments are to answer "why" provide context for later reader. If code already infers what is doing clearly, we don't need comments.
 
 ---
 
