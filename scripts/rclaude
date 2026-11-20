@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+# rclaude - run claude in a Rex tab so you can leave and come back
+set -euo pipefail
+
+if [[ -z "${REX_SESSION:-}" ]]; then
+    echo "rclaude: not inside rex, just run claude directly" >&2
+    exit 1
+fi
+
+# Pick the right claude command based on profile in ~/.devenv.json
+profile=""
+if [[ -r "$HOME/.devenv.json" ]] && command -v jq >/dev/null 2>&1; then
+    profile=$(jq -r '.profile // ""' "$HOME/.devenv.json")
+fi
+
+if [[ "$profile" == "uber" ]]; then
+    set -- aifx agent run claude "$@"
+else
+    set -- claude "$@"
+fi
+
+window=$(rex window ls -s "$REX_SESSION" --json \
+    | jq -r 'first(.windows[] | select(.label == "claude") | .window_id) // empty')
+
+if [[ -n "$window" ]]; then
+    rex focus -s "$REX_SESSION" "$window"
+    exit 0
+fi
+
+rex window new -s "$REX_SESSION" claude -c "$PWD" -- "$@" >/dev/null

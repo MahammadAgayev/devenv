@@ -35,11 +35,6 @@
         path: "{{ zsh_custom }}/themes/powerlevel10k"
         state: absent
 
-    - name: Remove zsh-autosuggestions plugin
-      file:
-        path: "{{ home }}/.oh-my-zsh/plugins/zsh-autosuggestions"
-        state: absent
-
     # ─── Oh My Zsh ────────────────────────────────────────────────────────────
 
     - name: Remove Oh My Zsh

@@ -54,15 +54,17 @@ emit_mono() {
         | sed "s:^:$root/:;s:/\.$::"
 }
 
+discover() {
+    emit_flat "$HOME"
+    emit_flat "$HOME/Uber"
+    emit_flat "$HOME/Documents"
+    emit_flat "$HOME/Documents/src"
+    emit_flat "$HOME/src"
+    for r in "${MONO_ROOTS[@]}"; do emit_mono "$r"; done
+}
+
 build_table() {
-    {
-        emit_flat "$HOME"
-        emit_flat "$HOME/Uber"
-        emit_flat "$HOME/Documents"
-        emit_flat "$HOME/Documents/src"
-        emit_flat "$HOME/src"
-        for r in "${MONO_ROOTS[@]}"; do emit_mono "$r"; done
-    } | TSZ_WINS="$(tmux list-windows -a -F '#S	#I	#W' 2>/dev/null)" awk -v home="$HOME/" '
+    discover | TSZ_WINS="$(tmux list-windows -a -F '#S	#I	#W' 2>/dev/null)" awk -v home="$HOME/" '
         BEGIN {
             nw=split(ENVIRON["TSZ_WINS"], wl, "\n"); wc=0
             for (i=1;i<=nw;i++) {
@@ -88,6 +90,7 @@ build_table() {
 }
 
 [[ "$1" == --emit ]] && { build_table; exit 0; }
+[[ "$1" == --dirs ]] && { discover; exit 0; }
 
 # --- selection -------------------------------------------------------------
 

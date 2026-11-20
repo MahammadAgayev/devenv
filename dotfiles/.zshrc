@@ -112,8 +112,13 @@ source $ZSH/oh-my-zsh.sh
 # alias ohmyzsh="mate ~/.oh-my-zsh"
 
 #sessionizer
-bindkey -s ^f "$HOME/tmux-sessionizer\n"
-bindkey -s ^g "$HOME/tmux-ssh\n"
+if [[ -n $REX_SESSION && -z $TMUX ]]; then
+  bindkey -s ^f "$HOME/rex-sessionizer\n"
+  bindkey -s ^g "$HOME/rex-ssh\n"
+else
+  bindkey -s ^f "$HOME/tmux-sessionizer\n"
+  bindkey -s ^g "$HOME/tmux-ssh\n"
+fi
 
 alias vim="nvim"
 
@@ -153,19 +158,15 @@ _clip_copy() {
 }
 
 alias tssh="$HOME/tmux-ssh"
-alias tpi="$HOME/tpi"
 alias tclaude="$HOME/tclaude"
+alias rssh="$HOME/rex-ssh"
+alias rclaude="$HOME/rclaude"
 #Default unix editor
 export VISUAL=nvim
 export EDITOR="$VISUAL"
 
 # To customize prompt, run `p10k configure` or edit ~/.p10k.zsh.
 [[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh
-
-#Have tmux session open by default
-if command -v tmux &> /dev/null && [ -z "$TMUX" ]; then
-  tmux attach-session -t default || tmux new-session -s default
-fi
 
 OPENAI_API_KEY="N/A"
 

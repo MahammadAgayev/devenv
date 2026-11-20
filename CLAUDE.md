@@ -58,7 +58,7 @@ Two settings files, never edit `~/.claude/settings.json` directly — it's a sym
 - `claude/uber.json` — Uber profile: has `apiKeyHelper`, `otelHeadersHelper`, bazel permissions, `code-mcp` MCP server, `uber-dev` and `uber-reviewer` agents
 - `claude/personal.json` — Personal: minimal, no MCP, no bazel, basic LSP only
 
-`agents/AGENTS.md` (symlinked to both `~/.claude/CLAUDE.md` and `~/.pi/agent/AGENTS.md`) contains workflow guidelines — edit it here, not in `~/.claude/` or `~/.pi/`.
+`agents/AGENTS.md` (symlinked to `~/.claude/CLAUDE.md`) contains workflow guidelines — edit it here, not in `~/.claude/`.
 
 ### RTK Hook
 

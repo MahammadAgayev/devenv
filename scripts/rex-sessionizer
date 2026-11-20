@@ -1,0 +1,88 @@
+#!/usr/bin/env bash
+# rex-sessionizer — Rex port of tmux-sessionizer. Same project discovery
+# (tmux-sessionizer --dirs), pick with fzf, jump to/create a Rex session.
+# Switching the app's session needs Remote Control on (Rex Settings > Rex Server).
+
+session_id() {
+    rex ls --json | jq -r --arg n "$1" \
+        'first(.sessions[] | select(.label == $n) | .session_id) // empty'
+}
+
+switch_to() {
+    rex do session.select session_id="$1"
+}
+
+hydrate() {
+    local sid="$1" block="$2" dir="$3" cmd
+    if [[ -f "$dir/.ssh" ]]; then
+        rex send -s "$sid" -b "$block" "ssh $(cat "$dir/.ssh")"
+        rex send-key -s "$sid" -b "$block" enter
+    fi
+    if [[ -f "$dir/.tmux-sessionizer" ]]; then
+        cmd="source $dir/.tmux-sessionizer"
+    elif [[ -f "$HOME/.tmux-sessionizer" ]]; then
+        cmd="source $HOME/.tmux-sessionizer"
+    fi
+    if [[ -n $cmd ]]; then
+        rex send -s "$sid" -b "$block" "$cmd"
+        rex send-key -s "$sid" -b "$block" enter
+    fi
+}
+
+build_table() {
+    local live
+    live=$(rex ls --json 2>/dev/null | jq -r '.sessions[] | "\(.label)\t\(.session_id)"')
+    "$HOME/tmux-sessionizer" --dirs | REX_LIVE="$live" awk -v home="$HOME/" '
+        BEGIN {
+            n=split(ENVIRON["REX_LIVE"], ll, "\n"); c=0
+            for (i=1;i<=n;i++) {
+                if (ll[i]=="") continue
+                split(ll[i], f, "\t"); sid[f[1]]=f[2]; order[++c]=f[1]
+            }
+        }
+        { path=$0
+          label=path; sub("^"home,"",label); sub("src/code.uber.internal/","",label)
+          nm=path; sub(".*/","",nm); gsub(/\./,"_",nm)
+          if (nm in sid) { if (!(nm in lbl)) lbl[nm]=label; next }
+          print "1\t" label "\t" path }
+        END {
+            for (i=1;i<=c;i++) {
+                s=order[i]
+                print "0\t\342\227\217 " ((s in lbl)?lbl[s]:s) "\t\t" sid[s]
+            }
+        }' \
+      | sort -s -t"$(printf '\t')" -k1,1
+}
+
+if [[ $# -eq 1 ]]; then
+    selected="$1"
+else
+    result=$(build_table | fzf \
+        --delimiter=$'\t' --with-nth=2 --print-query \
+        --prompt='' --height=100% --reverse --tiebreak=index)
+    query=$(sed -n 1p <<<"$result")
+    picked=$(sed -n 2p <<<"$result")
+    if [[ -n "$picked" ]]; then
+        selected=$(printf '%s' "$picked" | cut -f3)
+        if [[ -z "$selected" ]]; then
+            switch_to "$(printf '%s' "$picked" | cut -f4)"
+            exit
+        fi
+    elif [[ -n "$query" ]]; then
+        selected="${query/#\~/$HOME}"
+        [[ "$selected" != /* ]] && selected="$PWD/$selected"
+    fi
+fi
+
+[[ -z "$selected" || ! -d "$selected" ]] && exit 0
+
+selected_name=$(basename "$selected" | tr . _)
+sid=$(session_id "$selected_name")
+
+if [[ -z "$sid" ]]; then
+    created=$(rex new "$selected_name" -c "$selected" --json) || exit 1
+    sid=$(jq -r '.session_id' <<<"$created")
+    hydrate "$sid" "$(jq -r '.initial_windows[0].block_ids[0]' <<<"$created")" "$selected"
+fi
+
+switch_to "$sid"
