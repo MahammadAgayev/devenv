@@ -3,6 +3,10 @@
 # (tmux-sessionizer --dirs), pick with fzf, jump to/create a Rex session.
 # Switching the app's session needs Remote Control on (Rex Settings > Rex Server).
 
+# Rex starts panes with the login-shell PATH, which lacks ~/.local/bin (where
+# rex lives on Linux hosts) because .zshrc adds it only for interactive shells.
+export PATH="$HOME/.local/bin:$PATH"
+
 session_id() {
     rex ls --json | jq -r --arg n "$1" \
         'first(.sessions[] | select(.label == $n) | .session_id) // empty'
