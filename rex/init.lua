@@ -18,7 +18,4 @@ rex.action{
   end,
 }
 
--- tmux-style prefix. ctrl+b needs a double press to reach the program.
-local p = "ctrl+b>"
-rex.bind(p .. "ctrl+b", "pane.send_key", { key = "ctrl+b" })
-rex.bind(p .. "f", "sessionizer")
+rex.bind("cmd+s", "sessionizer")

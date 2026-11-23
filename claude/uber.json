@@ -3,28 +3,33 @@
   "env": {
     "ANTHROPIC_BASE_URL": "https://genai-api.uberinternal.com",
     "ANTHROPIC_CUSTOM_HEADERS": "OpenAI-Organization: 3caa75e6-e440-4b5e-afc5-4cc3231cceb4",
-    "ANTHROPIC_CUSTOM_MODEL_OPTION": "claude-opus-5[1m]",
-    "ANTHROPIC_CUSTOM_MODEL_OPTION_DESCRIPTION": "Claude Opus 5",
-    "ANTHROPIC_CUSTOM_MODEL_OPTION_NAME": "Opus 5",
+    "ANTHROPIC_CUSTOM_MODEL_OPTION": "",
+    "ANTHROPIC_CUSTOM_MODEL_OPTION_DESCRIPTION": "",
+    "ANTHROPIC_CUSTOM_MODEL_OPTION_NAME": "",
+    "ANTHROPIC_DEFAULT_MODEL": "sonnet",
     "ANTHROPIC_VERTEX_BASE_URL": "https://genai-api.uberinternal.com/v1",
     "ANTHROPIC_VERTEX_PROJECT_ID": "progsys-genai-198685",
     "CLAUDE_CODE_API_KEY_HELPER_TTL_MS": "3600000",
     "CLAUDE_CODE_ATTRIBUTION_HEADER": "0",
     "CLAUDE_CODE_AUTO_COMPACT_WINDOW": "400000",
-    "CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS": "1",
+    "CLAUDE_CODE_AUTO_MODE_MODEL": "claude-sonnet-5-5",
+    "CLAUDE_CODE_AUTO_MODE_SERVER": "0",
+    "CLAUDE_CODE_BASH_EDIT_DIFF": "0",
+    "CLAUDE_CODE_DISABLE_ADVISOR_TOOL": "1",
+    "CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS": "0",
     "CLAUDE_CODE_ENABLE_AUTO_MODE": "1",
     "CLAUDE_CODE_ENABLE_TELEMETRY": "1",
     "CLAUDE_CODE_OTEL_HEADERS_HELPER_DEBOUNCE_MS": "3600000",
     "CLAUDE_CODE_SKIP_VERTEX_AUTH": "1",
     "CLAUDE_CODE_SUBAGENT_MODEL": "sonnet",
-    "CLAUDE_CODE_SUBAGENT_MODEL_FORCE": "1",
+    "CLAUDE_CODE_SUBAGENT_MODEL_FORCE": "",
     "CLAUDE_CODE_USE_VERTEX": "0",
     "CLOUD_ML_REGION": "global",
     "DISABLE_AUTOUPDATER": "1",
     "DISABLE_INSTALLATION_CHECKS": "1",
     "ENABLE_IDE_INTEGRATION": "true",
     "ENABLE_PROMPT_CACHING_1H": "1",
-    "ENABLE_TOOL_SEARCH": "false",
+    "ENABLE_TOOL_SEARCH": "true",
     "OTEL_EXPORTER_OTLP_ENDPOINT": "https://aifx-telemetry-proxy.uberinternal.com",
     "OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE": "delta",
     "OTEL_EXPORTER_OTLP_PROTOCOL": "http/json",
@@ -83,7 +88,7 @@
     ],
     "defaultMode": "default"
   },
-  "model": "claude-opus-5[1m]",
+  "model": "opus",
   "availableModels": [
     "sonnet",
     "opus",
@@ -93,8 +98,52 @@
   "enabledMcpjsonServers": [
     "code-mcp"
   ],
+  "disableClaudeAiConnectors": true,
   "hooks": {
+    "Notification": [
+      {
+        "matcher": "idle_prompt",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "aifx notification emit --agent claude_code >/dev/null 2>&1 || true",
+            "timeout": 10,
+            "async": true
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "case \"$AIFX_TRACING\" in off) exit 0;; on|private) ;; *) [ -e \"$HOME/.aifx/torchlight/enabled\" ] || exit 0;; esac; aifx tracing exec claude-code Notification || true",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PermissionDenied": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "case \"$AIFX_TRACING\" in off) exit 0;; on|private) ;; *) [ -e \"$HOME/.aifx/torchlight/enabled\" ] || exit 0;; esac; aifx tracing exec claude-code PermissionDenied || true",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
     "PermissionRequest": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "aifx notification emit --agent claude_code >/dev/null 2>&1 || true",
+            "timeout": 10,
+            "async": true
+          }
+        ]
+      },
       {
         "hooks": [
           {
@@ -102,6 +151,26 @@
             "command": "aifx analytics emit --agent claude_code",
             "timeout": 5,
             "async": true
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "case \"$AIFX_TRACING\" in off) exit 0;; on|private) ;; *) [ -e \"$HOME/.aifx/torchlight/enabled\" ] || exit 0;; esac; aifx tracing exec claude-code PermissionRequest || true",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PostCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "case \"$AIFX_TRACING\" in off) exit 0;; on|private) ;; *) [ -e \"$HOME/.aifx/torchlight/enabled\" ] || exit 0;; esac; aifx tracing exec claude-code PostCompact || true",
+            "timeout": 10
           }
         ]
       }
@@ -116,6 +185,15 @@
             "async": true
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "case \"$AIFX_TRACING\" in off) exit 0;; on|private) ;; *) [ -e \"$HOME/.aifx/torchlight/enabled\" ] || exit 0;; esac; aifx tracing exec claude-code PostToolUse || true",
+            "timeout": 10
+          }
+        ]
       }
     ],
     "PostToolUseFailure": [
@@ -126,6 +204,26 @@
             "command": "aifx analytics emit --agent claude_code",
             "timeout": 5,
             "async": true
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "case \"$AIFX_TRACING\" in off) exit 0;; on|private) ;; *) [ -e \"$HOME/.aifx/torchlight/enabled\" ] || exit 0;; esac; aifx tracing exec claude-code PostToolUseFailure || true",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "case \"$AIFX_TRACING\" in off) exit 0;; on|private) ;; *) [ -e \"$HOME/.aifx/torchlight/enabled\" ] || exit 0;; esac; aifx tracing exec claude-code PreCompact || true",
+            "timeout": 10
           }
         ]
       }
@@ -149,6 +247,15 @@
             "async": true
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "case \"$AIFX_TRACING\" in off) exit 0;; on|private) ;; *) [ -e \"$HOME/.aifx/torchlight/enabled\" ] || exit 0;; esac; aifx tracing exec claude-code PreToolUse || true",
+            "timeout": 10
+          }
+        ]
       }
     ],
     "SessionEnd": [
@@ -161,9 +268,27 @@
             "async": true
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "case \"$AIFX_TRACING\" in off) exit 0;; on|private) ;; *) [ -e \"$HOME/.aifx/torchlight/enabled\" ] || exit 0;; esac; aifx tracing exec claude-code SessionEnd || true",
+            "timeout": 10
+          }
+        ]
       }
     ],
     "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/bin/sh -c 'rex __internal session-start --agent claude --feature-session-naming=false 2>/dev/null || true'",
+            "timeout": 5
+          }
+        ]
+      },
       {
         "hooks": [
           {
@@ -173,6 +298,15 @@
             "async": true
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "case \"$AIFX_TRACING\" in off) exit 0;; on|private) ;; *) [ -e \"$HOME/.aifx/torchlight/enabled\" ] || exit 0;; esac; aifx tracing exec claude-code SessionStart || true",
+            "timeout": 10
+          }
+        ]
       }
     ],
     "Stop": [
@@ -180,9 +314,39 @@
         "hooks": [
           {
             "type": "command",
+            "command": "aifx notification emit --agent claude_code >/dev/null 2>&1 || true",
+            "timeout": 10,
+            "async": true
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
             "command": "aifx analytics emit --agent claude_code",
             "timeout": 5,
             "async": true
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "case \"$AIFX_TRACING\" in off) exit 0;; on|private) ;; *) [ -e \"$HOME/.aifx/torchlight/enabled\" ] || exit 0;; esac; aifx tracing exec claude-code Stop || true",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "StopFailure": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "case \"$AIFX_TRACING\" in off) exit 0;; on|private) ;; *) [ -e \"$HOME/.aifx/torchlight/enabled\" ] || exit 0;; esac; aifx tracing exec claude-code StopFailure || true",
+            "timeout": 10
           }
         ]
       }
@@ -197,6 +361,15 @@
             "async": true
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "case \"$AIFX_TRACING\" in off) exit 0;; on|private) ;; *) [ -e \"$HOME/.aifx/torchlight/enabled\" ] || exit 0;; esac; aifx tracing exec claude-code SubagentStart || true",
+            "timeout": 10
+          }
+        ]
       }
     ],
     "SubagentStop": [
@@ -207,6 +380,26 @@
             "command": "aifx analytics emit --agent claude_code",
             "timeout": 5,
             "async": true
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "case \"$AIFX_TRACING\" in off) exit 0;; on|private) ;; *) [ -e \"$HOME/.aifx/torchlight/enabled\" ] || exit 0;; esac; aifx tracing exec claude-code SubagentStop || true",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "UserPromptExpansion": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "case \"$AIFX_TRACING\" in off) exit 0;; on|private) ;; *) [ -e \"$HOME/.aifx/torchlight/enabled\" ] || exit 0;; esac; aifx tracing exec claude-code UserPromptExpansion || true",
+            "timeout": 10
           }
         ]
       }
@@ -221,28 +414,49 @@
             "async": true
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "case \"$AIFX_TRACING\" in off) exit 0;; on|private) ;; *) [ -e \"$HOME/.aifx/torchlight/enabled\" ] || exit 0;; esac; aifx tracing exec claude-code UserPromptSubmit || true",
+            "timeout": 10
+          }
+        ]
       }
     ]
   },
   "disableWorkflows": true,
+  "enableArtifact": false,
   "statusLine": {
     "type": "command",
-    "command": "aifx statusline"
+    "command": "aifx statusline",
+    "refreshInterval": 60
   },
   "enabledPlugins": {
     "agent-guard@agent-marketplace": true,
+    "agent-observability@agent-marketplace": true,
     "code-mode@agent-marketplace": true,
     "cost-check@agent-marketplace": true,
     "data-analyst@agent-marketplace": true,
+    "frontend-design@claude-plugins-official": true,
     "google-workspace@agent-marketplace": true,
     "gopls-lsp@claude-plugins-official": true,
+    "impact-resume-verifier@ams-prodeng": true,
     "jr@reichert-skills": true,
     "lua-lsp@claude-plugins-official": true,
     "slack@agent-marketplace": true,
     "uber-dev@agent-marketplace": true,
-    "uber-reviewer@agent-marketplace": true
+    "uber-reviewer@agent-marketplace": true,
+    "vibe@vibe-apps": true
   },
   "extraKnownMarketplaces": {
+    "ams-prodeng": {
+      "source": {
+        "source": "git",
+        "url": "gitolite@code.uber.internal:not-production/ams-prodeng.git"
+      }
+    },
     "reichert-skills": {
       "source": {
         "source": "git",
@@ -253,6 +467,12 @@
       "source": {
         "source": "directory",
         "path": "/Users/aghayev/.local/share/aifx/marketplaces/uber-code/devexp-agent-marketplace"
+      }
+    },
+    "uber-non-production/vibe-apps": {
+      "source": {
+        "source": "directory",
+        "path": "/Users/aghayev/.local/share/aifx/marketplaces/uber-non-production/vibe-apps"
       }
     }
   },
@@ -265,11 +485,19 @@
     "claude-opus-5": {
       "effortLevel": "medium"
     },
+    "claude-opus-5-5": {
+      "effortLevel": "medium"
+    },
     "claude-sonnet-5": {
       "effortLevel": "high"
     }
   },
   "fastMode": false,
+  "companyAnnouncements": [
+    "Tool search is now on for everyone: Claude Code loads MCP tools on demand instead of all at startup. Questions or issues: #aifx-support",
+    "Claude Fable 5.2 replaces Fable 5.1 for fable_access_group members, at $8/$40 per MTok (down from $10/$50). If /model still shows Fable 5.1, run `rm -rf ~/.cache/aifx/models ~/.cache/aifx/agents` and relaunch. Questions or issues: #aifx-support"
+  ],
+  "autoUpdatesChannel": "stable",
   "skipDangerousModePermissionPrompt": true,
   "autoCompactEnabled": false
 }

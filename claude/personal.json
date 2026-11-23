@@ -54,6 +54,76 @@
             "command": "~/.claude/hooks/rtk-rewrite.sh"
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "npx -y @open-pets/claude hook --openpets-managed",
+            "timeout": 3,
+            "async": true
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "npx -y @open-pets/claude hook --openpets-managed",
+            "timeout": 3,
+            "async": true
+          }
+        ]
+      }
+    ],
+    "PermissionRequest": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "npx -y @open-pets/claude hook --openpets-managed",
+            "timeout": 3,
+            "async": true
+          }
+        ]
+      }
+    ],
+    "Notification": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "npx -y @open-pets/claude hook --openpets-managed",
+            "timeout": 3,
+            "async": true
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "npx -y @open-pets/claude hook --openpets-managed",
+            "timeout": 3,
+            "async": true
+          }
+        ]
+      }
+    ],
+    "StopFailure": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "npx -y @open-pets/claude hook --openpets-managed",
+            "timeout": 3,
+            "async": true
+          }
+        ]
       }
     ]
   },
