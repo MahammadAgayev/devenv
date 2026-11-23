@@ -1,7 +1,7 @@
 [user]
 	name = Mahammad Aghayev
 	email = mahammadmaghayev@gmail.com
-	signingkey = 5F:73:D1:9D:54:14:A5:F0:14:B7:89:18:23:64:37:D6:CB:7B:4F:E1
+	signingkey = 14:9C:F4:2C:07:70:70:F0:52:10:F1:1A:54:20:FE:76:5E:42:72:4E
 
 [alias]
     lg = log --graph --pretty=format:'%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%ar) %C(bold blue)<%an>%Creset'
@@ -59,4 +59,4 @@
 [gpg]
 	format = x509
 [gpg "x509"]
-	program = /opt/uber/bin/signingfx
+	program = signingfx
