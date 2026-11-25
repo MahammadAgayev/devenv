@@ -1,3 +1,6 @@
+require("themes")
+require("settings")
+
 -- iTerm2 GlobalKeyMap 0xd-0x20000: shift+enter sends a newline (\n)
 rex.bind("shift+enter", "pane.send_key", { key = "ctrl+j" })
 

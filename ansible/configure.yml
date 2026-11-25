@@ -105,8 +105,30 @@
 
     - name: Symlink Rex config
       file:
-        src: "{{ devenv }}/rex/init.lua"
-        dest: "{{ home }}/.config/rex/init.lua"
+        src: "{{ devenv }}/rex/{{ item }}"
+        dest: "{{ home }}/.config/rex/{{ item }}"
+        state: link
+        force: true
+      loop: [init.lua, themes.lua, settings.lua]
+
+    # Theme and app settings belong to the Rex app, so they apply only where
+    # it runs. Skipped quietly when Rex is not running.
+    - name: Apply Rex settings and devenv theme
+      shell: rex config reload && rex do apply_settings --timeout 30s
+      when: ansible_system == 'Darwin'
+      failed_when: false
+      changed_when: false
+
+    - name: Ensure ~/.config/opencode exists
+      file:
+        path: "{{ home }}/.config/opencode"
+        state: directory
+        mode: '0755'
+
+    - name: Symlink opencode CLI config
+      file:
+        src: "{{ devenv }}/dotfiles/opencode-cli.json"
+        dest: "{{ home }}/.config/opencode/cli.json"
         state: link
         force: true
 

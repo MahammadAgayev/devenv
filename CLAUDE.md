@@ -64,6 +64,10 @@ Two settings files, never edit `~/.claude/settings.json` directly — it's a sym
 
 `claude/hooks/rtk-rewrite.sh` is a PreToolUse hook that rewrites bash commands to RTK equivalents for token savings. All rewrite logic lives in `rtk rewrite` (Rust binary) — the shell script just delegates. Requires `rtk >= 0.23.0` and `jq`.
 
+### Rex Themes and Settings
+
+`rex/themes.lua` holds the palettes (Peach Veranda, Rosé Pine, Tokyo Night), each with a dark and a light variant. The `theme` action sets both Rex theme slots, the appearance, and writes `~/.claude/themes/rex.json` (Claude Code uses `custom:rex`). opencode uses its `system` theme, which reads the Rex colors. Rex app settings are client-side, so `rex/settings.lua` applies them with `rex do apply_settings` on a new machine.
+
 ### Remote Sync
 
 `remote.py` SSHes into registered remotes (stored in `~/.devenv.json` under `remotes`), runs git pull, and optionally runs `sync.py`. It also merges zsh history across machines (dedup by timestamp).

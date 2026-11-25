@@ -63,7 +63,11 @@ def cmd_config(args):
         config["profile"] = args.profile
         save_config(config)
         print(f"Profile set to: {args.profile}")
-    else:
+    if args.rex_theme:
+        config["rex_theme"] = args.rex_theme
+        save_config(config)
+        print(f"Rex theme set to: {args.rex_theme}")
+    if not args.profile and not args.rex_theme:
         print(json.dumps(config, indent=2))
     return 0
 
@@ -78,6 +82,12 @@ def main():
 
     config_parser = subparsers.add_parser("config", help="Show/set config")
     config_parser.add_argument("--profile", choices=["uber", "personal"], help="Set profile")
+    config_parser.add_argument(
+        "--rex-theme",
+        metavar="PALETTE:MODE",
+        help="Set the Rex terminal theme; Claude Code gets matching colors. "
+        "One of peach-veranda, rose-pine, tokyo-night with :light or :dark (default: peach-veranda:light)",
+    )
 
     args = parser.parse_args()
 

@@ -499,5 +499,6 @@
   ],
   "autoUpdatesChannel": "stable",
   "skipDangerousModePermissionPrompt": true,
-  "autoCompactEnabled": false
+  "autoCompactEnabled": false,
+  "theme": "custom:rex"
 }
