@@ -84,9 +84,9 @@ def main():
     config_parser.add_argument("--profile", choices=["uber", "personal"], help="Set profile")
     config_parser.add_argument(
         "--rex-theme",
-        metavar="PALETTE:MODE",
-        help="Set the Rex terminal theme; Claude Code gets matching colors. "
-        "One of peach-veranda, rose-pine, tokyo-night with :light or :dark (default: peach-veranda:light)",
+        nargs="?",
+        choices=[f"{p}:{m}" for p in ["peach-veranda", "rose-pine", "tokyo-night"] for m in ["light", "dark"]],
+        help="Set the Rex terminal theme; Claude Code gets matching colors (default: peach-veranda:light)",
     )
 
     args = parser.parse_args()
